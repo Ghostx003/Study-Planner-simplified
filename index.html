@@ -179,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateKey = (date) => date.toISOString().split('T')[0];
     const distributeSubTaskHours = (subject) => { if (!subject || !subject.subTasks || !subject.subTasks.length === 0) return; const h = subject.hours / subject.subTasks.length; subject.subTasks.forEach(t => { t.hours = h; }); };
     
-    // MODIFICATION: New time formatter to show hours and minutes as requested.
     const formatHoursAndMinutes = (totalHours) => {
         if (totalHours === 0 || !totalHours) return '0 min';
         const hours = Math.floor(totalHours);
@@ -189,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return [hourString, minuteString].filter(Boolean).join(' ');
     };
 
-    // MODIFICATION: New compact time formatter for circles.
     const formatHoursAndMinutesCompact = (totalHours) => {
         if (totalHours === 0 || !totalHours) return '0m';
         const hours = Math.floor(totalHours);
@@ -199,7 +197,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${minutes}m`;
     };
 
-    // MODIFICATION: Smaller progress circle for the header to fix layout on small screens.
     const createSmallProgressCircle = (progress) => {
         const size = 36; // w-9/h-9
         const sw = 4;
@@ -214,7 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // RENDERING LOGIC
-    // MODIFICATION: Re-engineered circle for better text fitting and consistent size.
     const createProgressCircle = (progress, textContent = '') => { 
         const size = 56; // Corresponds to w-14/h-14 in Tailwind
         const sw = 6; // Stroke width
@@ -227,18 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const render = () => { document.documentElement.setAttribute('data-theme', state.settings.theme); document.documentElement.setAttribute('data-accent', state.settings.accent); const today = new Date(); DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); renderSubjects(); renderProgress(); renderCountdown(); };
     const renderSubjects = () => { const key = formatDateKey(new Date()); const subjects = state.studyData[key] || []; DOM.subjectsList.innerHTML = ''; DOM.subjectsDoneList.innerHTML = ''; const active = subjects.filter(s => !s.completed); const done = subjects.filter(s => s.completed); if (subjects.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No subjects today. Click 'Randomize' or 'Edit'.</p>`; else if (active.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All subjects complete! Great work! 🎉</p>`; active.forEach(s => DOM.subjectsList.innerHTML += createSubjectHTML(s)); done.forEach(s => DOM.subjectsDoneList.innerHTML += createSubjectHTML(s)); DOM.completedSubjectsContainer.classList.toggle('hidden', done.length === 0); };
     
-    // MODIFICATION: Styling updated for bigger, more pleasing subject boxes for mobile.
+    // MODIFICATION: Improved alignment for smaller screens.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
         const progress = subject.completed ? 100 : subTaskProgress;
         return `
             <div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-subject-name="${subject.name}">
-                <div class="flex items-center p-4 gap-4">
+                <div class="flex items-center p-3 sm:p-4 gap-3">
                     <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
                     <div data-action="toggleMainSubjectCompletion" data-subject-name="${subject.name}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
-                    <div class="flex-grow">
-                        <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''}">${subject.name}</label>
+                    <div class="flex-grow min-w-0">
+                        <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
                     </div>
                     <button data-action="cycleSubjectStatus" data-subject-name="${subject.name}" class="status-btn status-${(subject.status || 'none').toLowerCase()}">${subject.status || 'None'}</button>
                     <div data-action="openModal" data-modal="edit-hours-modal" data-subject-name="${subject.name}" class="relative cursor-pointer" title="Edit time for ${subject.name}">
@@ -254,7 +250,21 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     };
     
-    const createSubTasksHTML = (subject) => { let html = '<div class="space-y-3 pt-3">'; subject.subTasks.forEach((task, index) => { html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-subject-name="${subject.name}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''}">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-subject-name="${subject.name}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-subject-name="${subject.name}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`; }); html += `</div><div class="flex items-center mt-4"><input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-subject-name="${subject.name}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary"></div>`; return html; };
+    // MODIFICATION: Improved alignment for smaller screens.
+    const createSubTasksHTML = (subject) => { 
+        let html = '<div class="space-y-3 pt-3">'; 
+        subject.subTasks.forEach((task, index) => { 
+            html += `<div class="flex items-center gap-2">
+                        <div data-action="toggleSubTaskCompletion" data-subject-name="${subject.name}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div>
+                        <span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span>
+                        <span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span>
+                        <button data-action="cycleSubTaskStatus" data-subject-name="${subject.name}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button>
+                        <button data-action="deleteSubTask" data-subject-name="${subject.name}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button>
+                    </div>`; 
+        }); 
+        html += `</div><div class="flex items-center mt-4"><input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-subject-name="${subject.name}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary"></div>`; 
+        return html; 
+    };
     
     const renderProgress = () => {
         const key = formatDateKey(new Date());
@@ -262,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalHours = subjects.reduce((s, c) => s + c.hours, 0);
         const completedHours = subjects.reduce((s, c) => { if (c.completed) return s + c.hours; if (c.subTasks.length > 0) return s + (c.hours / c.subTasks.length) * c.subTasks.filter(t => t.completed).length; return s; }, 0);
         const progress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0;
-        // MODIFICATION: Use smaller circle in header and prevent text wrapping for better mobile view.
         DOM.progressSummary.innerHTML = `<span class="text-sm font-semibold whitespace-nowrap">${formatHoursAndMinutes(completedHours)} / ${formatHoursAndMinutes(totalHours)}</span> ${createSmallProgressCircle(progress)}`;
         renderMotivationMessage(totalHours - completedHours);
     };
@@ -278,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const [h, m] = state.settings.sessionEndTime.split(':');
         end.setHours(parseInt(h), parseInt(m), 0, 0);
         const diffMs = end.getTime() - now.getTime();
-        // MODIFICATION: Motivation messages now display time in hours and minutes.
         let msg = `You have <strong>${formatHoursAndMinutes(remHours)}</strong> of tasks left.`;
         if (diffMs > 0) {
             const sessionMinsLeft = diffMs / 60000;
