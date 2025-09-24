@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let msg = `You have <strong>${formatHoursAndMinutes(remHours)}</strong> of tasks left.`;
         if (diffMs > 0) {
             const sessionMinsLeft = diffMs / 60000;
-            msg += ` Session ends in <strong>${Math.round(sessionMinsLeft)} minutes</strong>.`;
+            msg += ` Session ends in <strong>${formatHoursAndMinutes(sessionMinsLeft / 60)}</strong>.`;
             if (remHours * 60 > sessionMinsLeft) {
                 msg += ` <span style="color: var(--accent-danger);">Time to focus!</span>`;
             } else {
