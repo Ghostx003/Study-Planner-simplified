@@ -47,7 +47,8 @@
         .bg-tertiary { background-color: var(--bg-tertiary); }
         .border-main { border-color: var(--border-primary); }
         .border-secondary { border-color: var(--border-secondary); }
-        .btn { padding: 0.7rem 0.8rem; border-radius: 0.5rem; font-weight: 600; transition: background-color 0.2s, box-shadow 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        /* MODIFICATION: Reduced horizontal padding for better phone alignment. */
+        .btn { padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-weight: 600; transition: background-color 0.2s, box-shadow 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .btn-primary { background-color: var(--accent-primary); color: var(--text-on-accent); }
         .btn-primary:hover { background-color: var(--accent-hover); }
         .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
@@ -92,8 +93,8 @@
             <li><button data-action="openModal" data-modal="theme-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Customize Theme</button></li>
         </ul></nav>
     </aside>
-    <main class="flex items-start justify-center min-h-screen p-4 sm:p-6">
-        <div class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-6 md:p-8 border border-secondary">
+    <main class="flex items-start justify-center min-h-screen p-2 sm:p-4">
+        <div class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-4 sm:p-6 border border-secondary">
             <header class="flex items-center justify-between mb-4 flex-wrap gap-y-4">
                 <div class="flex items-center space-x-3">
                     <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
@@ -104,7 +105,7 @@
                         <p id="today-day" class="text-sm text-subtle font-medium"></p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2"> <!-- MODIFICATION: Reduced space between buttons -->
                     <div id="progress-summary" class="flex items-center space-x-2 text-md font-semibold text-main"></div>
                     <button data-action="openModal" data-modal="edit-subjects-modal" class="btn btn-secondary text-sm">Edit</button>
                     <button data-action="openModal" data-modal="randomize-modal" class="btn btn-primary text-sm">Randomize</button>
@@ -223,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const render = () => { document.documentElement.setAttribute('data-theme', state.settings.theme); document.documentElement.setAttribute('data-accent', state.settings.accent); const today = new Date(); DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); renderSubjects(); renderProgress(); renderCountdown(); };
     const renderSubjects = () => { const key = formatDateKey(new Date()); const subjects = state.studyData[key] || []; DOM.subjectsList.innerHTML = ''; DOM.subjectsDoneList.innerHTML = ''; const active = subjects.filter(s => !s.completed); const done = subjects.filter(s => s.completed); if (subjects.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No subjects today. Click 'Randomize' or 'Edit'.</p>`; else if (active.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All subjects complete! Great work! 🎉</p>`; active.forEach(s => DOM.subjectsList.innerHTML += createSubjectHTML(s)); done.forEach(s => DOM.subjectsDoneList.innerHTML += createSubjectHTML(s)); DOM.completedSubjectsContainer.classList.toggle('hidden', done.length === 0); };
     
-    // MODIFICATION: Removed status button from main subject.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
@@ -344,3 +344,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
