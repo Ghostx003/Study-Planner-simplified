@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const render = () => { document.documentElement.setAttribute('data-theme', state.settings.theme); document.documentElement.setAttribute('data-accent', state.settings.accent); const today = new Date(); DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); renderSubjects(); renderProgress(); renderCountdown(); };
     const renderSubjects = () => { const key = formatDateKey(new Date()); const subjects = state.studyData[key] || []; DOM.subjectsList.innerHTML = ''; DOM.subjectsDoneList.innerHTML = ''; const active = subjects.filter(s => !s.completed); const done = subjects.filter(s => s.completed); if (subjects.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No subjects today. Click 'Randomize' or 'Edit'.</p>`; else if (active.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All subjects complete! Great work! 🎉</p>`; active.forEach(s => DOM.subjectsList.innerHTML += createSubjectHTML(s)); done.forEach(s => DOM.subjectsDoneList.innerHTML += createSubjectHTML(s)); DOM.completedSubjectsContainer.classList.toggle('hidden', done.length === 0); };
     
-    // MODIFICATION: Improved alignment for smaller screens.
+    // MODIFICATION: Removed status button from main subject.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
@@ -236,7 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="flex-grow min-w-0">
                         <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
                     </div>
-                    <button data-action="cycleSubjectStatus" data-subject-name="${subject.name}" class="status-btn status-${(subject.status || 'none').toLowerCase()}">${subject.status || 'None'}</button>
                     <div data-action="openModal" data-modal="edit-hours-modal" data-subject-name="${subject.name}" class="relative cursor-pointer" title="Edit time for ${subject.name}">
                         ${createProgressCircle(progress, formatHoursAndMinutesCompact(subject.hours))}
                     </div>
@@ -250,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     };
     
-    // MODIFICATION: Improved alignment for smaller screens.
     const createSubTasksHTML = (subject) => { 
         let html = '<div class="space-y-3 pt-3">'; 
         subject.subTasks.forEach((task, index) => { 
@@ -319,15 +317,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); saveState(); },
         addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); saveState(); } },
         deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); saveState(); },
-        confirmEditSubjects: () => { const key = formatDateKey(new Date()); const current = state.studyData[key] || []; const newData = []; DOM.subjectsChecklist.querySelectorAll('input:checked').forEach(cb => { const name = cb.value; const existing = current.find(s => s.name === name); newData.push(existing || { name, hours: 1, completed: false, subTasks: [], status: 'None' }); }); state.studyData[key] = newData; closeModal(); render(); saveState(); },
-        confirmRandomize: () => { const opt = document.querySelector('input[name="subject-count"]:checked'); if (opt) { const num = parseInt(opt.value, 10); const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const random = shuffled.slice(0, num); state.studyData[formatDateKey(new Date())] = random.map(s => ({ name: s, hours: 1, completed: false, subTasks: [], status: 'None' })); closeModal(); render(); saveState(); } },
+        confirmEditSubjects: () => { const key = formatDateKey(new Date()); const current = state.studyData[key] || []; const newData = []; DOM.subjectsChecklist.querySelectorAll('input:checked').forEach(cb => { const name = cb.value; const existing = current.find(s => s.name === name); newData.push(existing || { name, hours: 1, completed: false, subTasks: [] }); }); state.studyData[key] = newData; closeModal(); render(); saveState(); },
+        confirmRandomize: () => { const opt = document.querySelector('input[name="subject-count"]:checked'); if (opt) { const num = parseInt(opt.value, 10); const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const random = shuffled.slice(0, num); state.studyData[formatDateKey(new Date())] = random.map(s => ({ name: s, hours: 1, completed: false, subTasks: [] })); closeModal(); render(); saveState(); } },
         confirmEditHours: (el) => { const name = DOM.hoursInput.dataset.subjectName; const hours = parseFloat(DOM.hoursInput.value); if (name && !isNaN(hours) && hours >= 0) { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.name === name); if (subject) { subject.hours = hours; distributeSubTaskHours(subject); } closeModal(); render(); saveState(); } else { DOM.hoursInput.classList.add('border-red-500'); setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500); } },
         toggleMainSubjectCompletion: (el) => { const s = state.studyData[formatDateKey(new Date())]?.find(s => s.name === el.dataset.subjectName); if (s) { s.completed = !s.completed; s.subTasks.forEach(t => t.completed = s.completed); render(); saveState(); } },
         toggleSubTaskPanel: (el) => { const n = el.dataset.subjectName; if (state.ui.openSubTaskPanels.has(n)) state.ui.openSubTaskPanels.delete(n); else state.ui.openSubTaskPanels.add(n); renderSubjects(); },
         addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.name === el.dataset.subjectName); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); saveState(); } },
         toggleSubTaskCompletion: (el) => { const { subjectName, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.name === subjectName); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); saveState(); } },
         deleteSubTask: (el) => { const { subjectName, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.name === subjectName); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); saveState(); } },
-        cycleSubjectStatus: (el) => { const s = state.studyData[formatDateKey(new Date())]?.find(s => s.name === el.dataset.subjectName); if(s){ const cur = ACTIVITY_TYPES.indexOf(s.status || 'None'); s.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); saveState(); } },
         cycleSubTaskStatus: (el) => { const { subjectName, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.name === subjectName)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); saveState(); } },
         confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); saveState(); },
     };
