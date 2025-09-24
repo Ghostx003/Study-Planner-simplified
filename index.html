@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Planner</title>
+    <!-- Tailwind CSS for rapid UI development -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* * ===============================================
+         * THEME & COLOR SYSTEM using CSS Variables
+         * ===============================================
+         * This system allows for easy switching between light/dark themes
+         * and different accent colors by changing data attributes on the <html> tag.
+         * Example: <html data-theme="dark" data-accent="blue">
+        */
+        :root {
+            /* Light Theme (Default) */
+            --bg-primary: #f4f5f7;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-primary: #d1d5db;
+            --border-secondary: #e5e7eb;
+            --accent-danger: #ef4444;
+            --text-on-accent: #ffffff;
+        }
+
+        html[data-theme="dark"] {
+            --bg-primary: #111111;
+            --bg-secondary: #181818;
+            --bg-tertiary: #282828;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --border-primary: #3a3a3a;
+            --border-secondary: #2d2d2d;
+        }
+        
+        /* Accent Colors */
+        html[data-accent="green"] { --accent-primary: #22c55e; --accent-hover: #16a34a; }
+        html[data-accent="blue"] { --accent-primary: #3b82f6; --accent-hover: #2563eb; }
+        html[data-accent="purple"] { --accent-primary: #a855f7; --accent-hover: #9333ea; }
+        html[data-accent="red"] { --accent-primary: #ef4444; --accent-hover: #dc2626; }
+
+        /* Translucent accent colors for focus rings */
+        html[data-accent="green"][data-theme="dark"] { --accent-translucent: rgba(34, 197, 94, 0.3); }
+        html[data-accent="blue"][data-theme="dark"] { --accent-translucent: rgba(59, 130, 246, 0.3); }
+        html[data-accent="purple"][data-theme="dark"] { --accent-translucent: rgba(168, 85, 247, 0.3); }
+        html[data-accent="red"][data-theme="dark"] { --accent-translucent: rgba(239, 68, 68, 0.3); }
+        html[data-accent="green"][data-theme="light"] { --accent-translucent: rgba(34, 197, 94, 0.2); }
+        html[data-accent="blue"][data-theme="light"] { --accent-translucent: rgba(59, 130, 246, 0.2); }
+        html[data-accent="purple"][data-theme="light"] { --accent-translucent: rgba(168, 85, 247, 0.2); }
+        html[data-accent="red"][data-theme="light"] { --accent-translucent: rgba(239, 68, 68, 0.2); }
+
+
+        /* * ===============================================
+         * BASE & COMPONENT STYLES
+         * ===============================================
+        */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.2s, color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Custom UI Components */
+        .bg-main { background-color: var(--bg-secondary); }
+        .text-main { color: var(--text-primary); }
+        .text-subtle { color: var(--text-secondary); }
+        .border-main { border-color: var(--border-primary); }
+        .border-secondary { border-color: var(--border-secondary); }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .btn-primary { background-color: var(--accent-primary); color: var(--text-on-accent); }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .btn-secondary:hover { background-color: var(--border-primary); }
+        
+        .input-main {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            border-radius: 0.5rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-main:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-translucent);
+        }
+        
+        /* Sidebar styles */
+        #sidebar { transition: transform 0.3s ease-in-out; transform: translateX(-100%); }
+        #sidebar.open { transform: translateX(0); }
+        #sidebar-overlay { transition: opacity 0.3s ease-in-out; background-color: rgba(0,0,0,0.5); }
+
+        /* Custom Checkbox */
+        .custom-checkbox {
+            border: 2px solid var(--border-primary);
+            transition: all 0.2s;
+        }
+        .custom-checkbox.completed {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+        .custom-checkbox.completed::after {
+            content: '✓';
+            color: white;
+            display: flex;
+            font-weight: bold;
+            align-items: center;
+            justify-content: center;
+        }
+        .subject-label.completed {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+        }
+
+        /* Drag and Drop */
+        .drag-handle { cursor: grab; }
+        .dragging { opacity: 0.5; background-color: var(--bg-tertiary); }
+        .drag-over { border-top: 2px solid var(--accent-primary); }
+
+        /* Progress Circle */
+        .progress-circle-bg { stroke: var(--border-primary); }
+        .progress-circle-fg { stroke: var(--accent-primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.5s ease; }
+
+        /* Status Pills */
+        .status-btn { padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600; font-size: 0.7rem; }
+        .status-none { background-color: rgba(107, 114, 128, 0.1); color: #6b7280; }
+        .status-lecture { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .status-revision { background-color: rgba(168, 85, 247, 0.1); color: #a855f7; }
+        .status-practice { background-color: rgba(249, 115, 22, 0.1); color: #f97316; }
+        .status-test { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    </style>
+</head>
+
+<body class="transition-colors duration-300">
+
+    <!-- Sidebar and Overlay -->
+    <div id="sidebar-overlay" data-action="toggleSidebar" class="fixed inset-0 z-40 hidden opacity-0"></div>
+    <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-main shadow-xl p-4 z-50 border-r border-secondary">
+        <h2 class="text-xl font-bold mb-6 text-main">Menu</h2>
+        <nav>
+            <ul>
+                <li><button data-action="openModal" data-modal="manage-subjects-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Manage Subjects</button></li>
+                <li><button data-action="openModal" data-modal="theme-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Customize Theme</button></li>
+            </ul>
+        </nav>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="flex items-start justify-center min-h-screen p-4 sm:p-6">
+        <div class="w-full max-w-2xl bg-main rounded-2xl shadow-lg p-6 md:p-8 border border-secondary">
+            
+            <!-- Header -->
+            <header class="flex items-center justify-between mb-4 flex-wrap gap-y-4">
+                <div class="flex items-center space-x-3">
+                    <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
+                        <svg class="w-6 h-6 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <div>
+                        <h1 id="today-date" class="text-xl font-bold text-main"></h1>
+                        <p id="today-day" class="text-sm text-subtle font-medium"></p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div id="progress-summary" class="flex items-center space-x-2 text-md font-semibold text-main"></div>
+                    <button data-action="openModal" data-modal="edit-subjects-modal" class="btn btn-secondary text-sm">Edit</button>
+                    <button data-action="openModal" data-modal="randomize-modal" class="btn btn-primary text-sm">Randomize</button>
+                </div>
+            </header>
+
+            <!-- Session Timer -->
+            <section id="session-timer-container" class="text-center mb-6 p-4 rounded-lg bg-tertiary">
+                <div class="flex items-center justify-center gap-4">
+                    <h3 id="session-countdown-title" class="text-md font-semibold text-subtle">Session Countdown</h3>
+                    <button data-action="openModal" data-modal="session-end-time-modal" class="px-3 py-1 btn-secondary rounded-lg text-xs font-semibold">Set End Time</button>
+                </div>
+                <div id="session-countdown" class="text-4xl font-bold my-2 text-main" style="color: var(--accent-primary); font-variant-numeric: tabular-nums;">--:--:--</div>
+                <p id="session-motivation" class="text-sm text-subtle font-medium">Set an end time to begin.</p>
+            </section>
+            
+            <hr class="border-main my-6">
+
+            <!-- Subjects List -->
+            <section id="subjects-container">
+                <div id="subjects-list" class="space-y-3"></div>
+                <div id="completed-subjects-container" class="mt-8 hidden">
+                    <h4 class="text-lg font-bold text-main mb-3 border-b border-main pb-2">Completed</h4>
+                    <div id="subjects-done-list" class="space-y-3"></div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="theme-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-sm">
+            <h4 class="text-xl font-bold mb-5 text-main">Customize Theme</h4>
+            <div id="theme-options" class="space-y-6"></div>
+            <div class="flex justify-end mt-6">
+                <button data-action="closeModal" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="manage-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h4 class="text-xl font-bold mb-2 text-main">Manage Subjects</h4>
+            <p class="text-sm text-subtle mb-4">Add or remove subjects from your master list.</p>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="new-subject-input" placeholder="Add new subject..." class="w-full p-2 input-main">
+                <button data-action="addMasterSubject" class="btn btn-primary">Add</button>
+            </div>
+            <div id="master-subjects-list" class="space-y-2 mb-6 max-h-64 overflow-y-auto border-y border-main py-3"></div>
+            <div class="flex justify-end space-x-3">
+                <button data-action="closeModal" class="btn btn-secondary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h4 class="text-xl font-bold mb-5 text-main">Select Subjects for Today</h4>
+            <div id="subjects-checklist" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6 max-h-64 overflow-y-auto"></div>
+            <div class="flex justify-end space-x-3">
+                <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
+                <button data-action="confirmEditSubjects" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="randomize-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h4 class="text-xl font-bold mb-5 text-main">How many subjects?</h4>
+            <div id="subject-count-options" class="grid grid-cols-4 sm:grid-cols-5 gap-3 mb-6"></div>
+            <div class="flex justify-end space-x-3">
+                <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
+                <button data-action="confirmRandomize" class="btn btn-primary">Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="session-end-time-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <h4 class="text-xl font-bold mb-4 text-main">Session End Time</h4>
+            <input type="time" id="session-end-time-input" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main">
+            <div class="flex justify-end space-x-3">
+                <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
+                <button data-action="confirmEndTime" class="btn btn-primary">Set</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <h4 class="text-xl font-bold mb-2 text-main">Set Hours for</h4>
+            <p id="edit-hours-subject-name" class="text-md mb-4 text-subtle"></p>
+            <input type="number" id="hours-input" min="0.5" step="0.5" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main">
+            <div class="flex justify-end space-x-3">
+                <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
+                <button data-action="confirmEditHours" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+    
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // ===============================================
+    // APP STATE & CONFIGURATION
+    // ===============================================
+    const state = {
+        masterSubjects: [],
+        studyData: {}, // { 'YYYY-MM-DD': [ {name, hours, completed, ...} ] }
+        settings: {
+            theme: 'dark',
+            accent: 'green',
+            sessionEndTime: null,
+        },
+        ui: {
+            currentModal: null,
+            openSubTaskPanels: new Set(),
+            draggedSubjectName: null,
+        }
+    };
+
+    const ACTIVITY_TYPES = ['None', 'Lecture', 'Revision', 'Practice', 'Test'];
+
+    // ===============================================
+    // DOM ELEMENT SELECTORS
+    // ===============================================
+    const DOM = {
+        sidebar: document.getElementById('sidebar'),
+        sidebarOverlay: document.getElementById('sidebar-overlay'),
+        todayDate: document.getElementById('today-date'),
+        todayDay: document.getElementById('today-day'),
+        progressSummary: document.getElementById('progress-summary'),
+        subjectsList: document.getElementById('subjects-list'),
+        subjectsDoneList: document.getElementById('subjects-done-list'),
+        completedSubjectsContainer: document.getElementById('completed-subjects-container'),
+        sessionCountdown: document.getElementById('session-countdown'),
+        sessionCountdownTitle: document.getElementById('session-countdown-title'),
+        sessionMotivation: document.getElementById('session-motivation'),
+        // Modals
+        modals: document.querySelectorAll('.fixed.inset-0'),
+        newSubjectInput: document.getElementById('new-subject-input'),
+        masterSubjectsList: document.getElementById('master-subjects-list'),
+        subjectsChecklist: document.getElementById('subjects-checklist'),
+        subjectCountOptions: document.getElementById('subject-count-options'),
+        sessionEndTimeInput: document.getElementById('session-end-time-input'),
+        themeOptions: document.getElementById('theme-options'),
+        hoursInput: document.getElementById('hours-input'),
+        editHoursSubjectName: document.getElementById('edit-hours-subject-name'),
+    };
+    
+    // ===============================================
+    // DATA PERSISTENCE (LocalStorage)
+    // ===============================================
+    const saveState = () => {
+        localStorage.setItem('studyPlannerState', JSON.stringify(state));
+    };
+
+    const loadState = () => {
+        const savedState = localStorage.getItem('studyPlannerState');
+        if (savedState) {
+            Object.assign(state, JSON.parse(savedState));
+            // Ensure sets are properly reconstructed
+            state.ui.openSubTaskPanels = new Set(Array.from(state.ui.openSubTaskPanels));
+        } else {
+            // Default state for first-time users
+            state.masterSubjects = ['Physics', 'Chemistry', 'Math', 'Biology', 'History', 'English'];
+        }
+    };
+    
+    // ===============================================
+    // UTILITY & HELPER FUNCTIONS
+    // ===============================================
+    const formatDateKey = (date) => date.toISOString().split('T')[0];
+
+    // ===============================================
+    // RENDERING LOGIC (Updating the UI)
+    // ===============================================
+    
+    /**
+     * Creates an SVG progress circle component.
+     * @param {number} progress - The progress percentage (0-100).
+     * @param {string|number} textContent - Text to display inside the circle.
+     * @returns {string} - The HTML string for the SVG element.
+     */
+    const createProgressCircle = (progress, textContent = '') => {
+        const radius = 14;
+        const strokeWidth = 4;
+        const size = (radius + strokeWidth) * 2;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (progress / 100) * circumference;
+        const textHTML = textContent ? `<text x="50%" y="50%" dy=".3em" text-anchor="middle" class="text-xs font-bold" fill="var(--text-primary)">${textContent}</text>` : '';
+
+        return `
+            <svg class="w-${size/4} h-${size/4} flex-shrink-0" viewBox="0 0 ${size} ${size}">
+                <circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${radius}" stroke-width="${strokeWidth}" fill="none"></circle>
+                <circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${radius}" stroke-width="${strokeWidth}" fill="none"
+                        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"></circle>
+                ${textHTML}
+            </svg>
+        `;
+    };
+
+    /**
+     * Main render function to update the entire UI based on the current state.
+     */
+    const render = () => {
+        // Apply theme and accent
+        document.documentElement.setAttribute('data-theme', state.settings.theme);
+        document.documentElement.setAttribute('data-accent', state.settings.accent);
+
+        // Update date and day
+        const today = new Date();
+        DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+        // Render subjects for today
+        renderSubjects();
+        renderProgress();
+        renderCountdown();
+    };
+    
+    /**
+     * Renders the list of active and completed subjects for the current day.
+     */
+    const renderSubjects = () => {
+        const dateKey = formatDateKey(new Date());
+        const daySubjects = state.studyData[dateKey] || [];
+
+        DOM.subjectsList.innerHTML = '';
+        DOM.subjectsDoneList.innerHTML = '';
+        
+        const activeSubjects = daySubjects.filter(s => !s.completed);
+        const doneSubjects = daySubjects.filter(s => s.completed);
+
+        if (daySubjects.length === 0) {
+            DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No subjects for today. Click 'Randomize' or 'Edit' to start.</p>`;
+        } else if (activeSubjects.length === 0) {
+            DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All subjects for today are complete! Great work! 🎉</p>`;
+        }
+
+        activeSubjects.forEach(subject => DOM.subjectsList.innerHTML += createSubjectHTML(subject));
+        doneSubjects.forEach(subject => DOM.subjectsDoneList.innerHTML += createSubjectHTML(subject));
+        
+        DOM.completedSubjectsContainer.classList.toggle('hidden', doneSubjects.length === 0);
+    };
+
+    /**
+     * Creates the HTML string for a single subject item.
+     * @param {object} subject - The subject data object.
+     * @returns {string} - The HTML string for the subject.
+     */
+    const createSubjectHTML = (subject) => {
+        const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
+        const subTaskProgress = subject.subTasks.length > 0
+            ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100
+            : 0;
+        const progress = subject.completed ? 100 : subTaskProgress;
+
+        return `
+            <div class="bg-tertiary rounded-lg overflow-hidden border border-secondary" draggable="true" data-subject-name="${subject.name}">
+                <div class="flex items-center p-3 gap-3">
+                    <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
+                    <div data-action="toggleMainSubjectCompletion" data-subject-name="${subject.name}" class="custom-checkbox w-5 h-5 rounded cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
+                    <div class="flex-grow">
+                        <label class="subject-label font-semibold text-main ${subject.completed ? 'completed' : ''}">${subject.name}</label>
+                    </div>
+                    <button data-action="cycleSubjectStatus" data-subject-name="${subject.name}" class="status-btn status-${(subject.status || 'none').toLowerCase()}">${subject.status || 'None'}</button>
+                    <div data-action="openModal" data-modal="edit-hours-modal" data-subject-name="${subject.name}" class="relative cursor-pointer" title="Edit hours for ${subject.name}">
+                        ${createProgressCircle(progress, subject.hours)}
+                    </div>
+                    <button data-action="toggleSubTaskPanel" data-subject-name="${subject.name}" class="p-1 rounded-full hover:bg-border-primary transition-colors">
+                        <svg class="w-6 h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                <div class="subtask-container p-4 pt-3 border-t border-secondary ${isPanelOpen ? '' : 'hidden'}">
+                    ${isPanelOpen ? createSubTasksHTML(subject) : ''}
+                </div>
+            </div>
+        `;
+    };
+    
+    /**
+     * Creates the HTML for sub-tasks within a subject.
+     */
+    const createSubTasksHTML = (subject) => {
+        let html = '<div class="space-y-2">';
+        subject.subTasks.forEach((task, index) => {
+            html += `
+                <div class="flex items-center gap-3">
+                    <div data-action="toggleSubTaskCompletion" data-subject-name="${subject.name}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer flex-shrink-0 ${task.completed ? 'completed' : ''}"></div>
+                    <span class="flex-grow text-sm text-main ${task.completed ? 'completed' : ''}">${task.text}</span>
+                    <button data-action="deleteSubTask" data-subject-name="${subject.name}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        html += `
+            <div class="flex items-center mt-3">
+                <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-subject-name="${subject.name}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary">
+            </div>
+        `;
+        return html;
+    };
+
+    /**
+     * Renders the overall progress summary in the header.
+     */
+    const renderProgress = () => {
+        const dateKey = formatDateKey(new Date());
+        const daySubjects = state.studyData[dateKey] || [];
+        
+        const totalHours = daySubjects.reduce((sum, s) => sum + s.hours, 0);
+        const completedHours = daySubjects.reduce((sum, s) => {
+            if (s.completed) return sum + s.hours;
+            if (s.subTasks.length > 0) {
+                const completedSubTasks = s.subTasks.filter(t => t.completed).length;
+                return sum + (s.hours / s.subTasks.length) * completedSubTasks;
+            }
+            return sum;
+        }, 0);
+
+        const overallProgress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0;
+        
+        DOM.progressSummary.innerHTML = `
+            <span class="text-sm font-semibold">${completedHours.toFixed(1)} / ${totalHours.toFixed(1)} hrs</span>
+            ${createProgressCircle(overallProgress)}
+        `;
+        renderMotivationMessage(totalHours - completedHours);
+    };
+
+    /**
+     * Updates the countdown timer and motivation message.
+     */
+    let countdownInterval = null;
+    const renderCountdown = () => {
+        if (countdownInterval) clearInterval(countdownInterval);
+        if (!state.settings.sessionEndTime) {
+            DOM.sessionCountdown.textContent = '--:--:--';
+            return;
+        }
+        
+        const update = () => {
+            const now = new Date();
+            const end = new Date();
+            const [endHours, endMinutes] = state.settings.sessionEndTime.split(':');
+            end.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+
+            const diffMs = end.getTime() - now.getTime();
+            if (diffMs <= 0) {
+                DOM.sessionCountdown.textContent = '00:00:00';
+                clearInterval(countdownInterval);
+                return;
+            }
+            const hours = Math.floor(diffMs / 3600000).toString().padStart(2, '0');
+            const minutes = Math.floor((diffMs % 3600000) / 60000).toString().padStart(2, '0');
+            const seconds = Math.floor((diffMs % 60000) / 1000).toString().padStart(2, '0');
+            DOM.sessionCountdown.textContent = `${hours}:${minutes}:${seconds}`;
+        };
+        update();
+        countdownInterval = setInterval(update, 1000);
+    };
+
+    const renderMotivationMessage = (remainingHours) => {
+        if (!state.settings.sessionEndTime) {
+            DOM.sessionMotivation.innerHTML = 'Set an end time to track your progress.';
+            return;
+        }
+
+        const now = new Date();
+        const end = new Date();
+        const [endHours, endMinutes] = state.settings.sessionEndTime.split(':');
+        end.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+        const diffMs = end.getTime() - now.getTime();
+        
+        if (remainingHours <= 0) {
+            DOM.sessionMotivation.innerHTML = "All tasks done! You're amazing! 🚀";
+            return;
+        }
+
+        let message = `You have <strong>${remainingHours.toFixed(1)} hours</strong> of tasks left.`;
+        
+        if (diffMs > 0) {
+            const sessionMinutesLeft = diffMs / 60000;
+            const sessionHoursLeft = sessionMinutesLeft / 60;
+            const formattedSessionTime = sessionMinutesLeft > 60 
+                ? `${sessionHoursLeft.toFixed(1)} hours` 
+                : `${Math.round(sessionMinutesLeft)} minutes`;
+            message += ` Session ends in <strong>${formattedSessionTime}</strong>.`;
+            
+            if (remainingHours > sessionHoursLeft) {
+                message += ` <span style="color: var(--accent-danger);">Time to focus!</span>`;
+            } else {
+                message += ` You're on track!`;
+            }
+        } else {
+            message += ` Session has ended. Great work!`;
+        }
+    
+        DOM.sessionMotivation.innerHTML = message;
+    }
+
+
+    // ===============================================
+    // MODAL HANDLING
+    // ===============================================
+    const openModal = (modalId, payload = null) => {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        if (modalId === 'manage-subjects-modal') setupManageSubjectsModal();
+        if (modalId === 'edit-subjects-modal') setupEditSubjectsModal();
+        if (modalId === 'randomize-modal') setupRandomizeModal();
+        if (modalId === 'session-end-time-modal') setupEndTimeModal();
+        if (modalId === 'theme-modal') setupThemeModal();
+        if (modalId === 'edit-hours-modal') setupEditHoursModal(payload);
+
+        state.ui.currentModal = modal;
+        modal.classList.remove('hidden');
+    };
+
+    const closeModal = () => {
+        if (state.ui.currentModal) {
+            state.ui.currentModal.classList.add('hidden');
+            state.ui.currentModal = null;
+        }
+    };
+
+    // Setup functions for each modal
+    const setupManageSubjectsModal = () => {
+        DOM.masterSubjectsList.innerHTML = state.masterSubjects.map(subject => `
+            <div class="flex items-center justify-between p-1">
+                <label class="text-main">${subject}</label>
+                <button data-action="deleteMasterSubject" data-subject-name="${subject}" class="text-subtle font-bold text-xl px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button>
+            </div>
+        `).join('');
+    };
+    
+    const setupEditSubjectsModal = () => {
+        const dateKey = formatDateKey(new Date());
+        const currentSubjectNames = (state.studyData[dateKey] || []).map(s => s.name);
+        DOM.subjectsChecklist.innerHTML = state.masterSubjects.map(subject => `
+             <div class="flex items-center">
+                <input type="checkbox" id="edit-${subject}" value="${subject}" class="w-4 h-4" ${currentSubjectNames.includes(subject) ? 'checked' : ''}>
+                <label for="edit-${subject}" class="ml-2 text-sm font-medium text-main">${subject}</label>
+            </div>
+        `).join('');
+    };
+
+    const setupRandomizeModal = () => {
+        let html = '';
+        for (let i = 1; i <= state.masterSubjects.length; i++) {
+            html += `
+                <div>
+                    <input type="radio" name="subject-count" id="count-${i}" value="${i}" class="hidden peer">
+                    <label for="count-${i}" class="block text-center p-3 border-2 border-main rounded-lg cursor-pointer peer-checked:bg-accent-primary peer-checked:text-white peer-checked:border-accent-primary">${i}</label>
+                </div>
+            `;
+        }
+        DOM.subjectCountOptions.innerHTML = html;
+    };
+
+    const setupEndTimeModal = () => {
+        DOM.sessionEndTimeInput.value = state.settings.sessionEndTime;
+    };
+
+    const setupEditHoursModal = (subjectName) => {
+        const dateKey = formatDateKey(new Date());
+        const subject = state.studyData[dateKey]?.find(s => s.name === subjectName);
+        if(subject){
+            DOM.editHoursSubjectName.textContent = subject.name;
+            DOM.hoursInput.value = subject.hours;
+            DOM.hoursInput.dataset.subjectName = subject.name; // Store for confirmation
+        }
+    };
+    
+    const setupThemeModal = () => {
+        const accents = [ { name: 'green', color: '#22c55e' }, { name: 'blue', color: '#3b82f6' }, { name: 'purple', color: '#a855f7' }, { name: 'red', color: '#ef4444' } ];
+        DOM.themeOptions.innerHTML = `
+            <div>
+                <h5 class="text-sm font-bold text-subtle mb-3">Theme</h5>
+                <div class="grid grid-cols-2 gap-4">
+                    <button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme === 'light' ? 'border-2 border-accent-primary' : ''}">Light</button>
+                    <button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme === 'dark' ? 'border-2 border-accent-primary' : ''}">Dark</button>
+                </div>
+            </div>
+            <div>
+                <h5 class="text-sm font-bold text-subtle mb-3">Accent Color</h5>
+                <div class="flex items-center justify-around gap-4">
+                    ${accents.map(a => `<button data-action="setAccent" data-accent="${a.name}" class="w-12 h-12 rounded-full ${state.settings.accent === a.name ? 'ring-2 ring-offset-2 ring-accent-primary ring-offset-bg-main' : ''}" style="background-color: ${a.color};"></button>`).join('')}
+                </div>
+            </div>
+        `;
+    };
+
+    // ===============================================
+    // ACTIONS & EVENT HANDLERS
+    // ===============================================
+    const actions = {
+        // Sidebar & Modal Actions
+        toggleSidebar: () => {
+            const isOpen = DOM.sidebar.classList.contains('open');
+            if (isOpen) {
+                DOM.sidebar.classList.remove('open');
+                DOM.sidebarOverlay.classList.add('opacity-0');
+                setTimeout(() => DOM.sidebarOverlay.classList.add('hidden'), 300);
+            } else {
+                DOM.sidebarOverlay.classList.remove('hidden');
+                setTimeout(() => {
+                    DOM.sidebar.classList.add('open');
+                    DOM.sidebarOverlay.classList.remove('opacity-0');
+                }, 10);
+            }
+        },
+        openModal: (el) => openModal(el.dataset.modal, el.dataset.subjectName),
+        closeModal: () => closeModal(),
+
+        // Theme Actions
+        setTheme: (el) => { state.settings.theme = el.dataset.theme; setupThemeModal(); render(); saveState(); },
+        setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); saveState(); },
+
+        // Subject Management
+        addMasterSubject: () => {
+            const newSubject = DOM.newSubjectInput.value.trim();
+            if (newSubject && !state.masterSubjects.find(s => s.toLowerCase() === newSubject.toLowerCase())) {
+                state.masterSubjects.push(newSubject);
+                DOM.newSubjectInput.value = '';
+                setupManageSubjectsModal();
+                saveState();
+            }
+        },
+        deleteMasterSubject: (el) => {
+            state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName);
+            setupManageSubjectsModal();
+            saveState();
+        },
+        confirmEditSubjects: () => {
+            const dateKey = formatDateKey(new Date());
+            const currentDayData = state.studyData[dateKey] || [];
+            const newDayData = [];
+            DOM.subjectsChecklist.querySelectorAll('input:checked').forEach(checkbox => {
+                const subjectName = checkbox.value;
+                const existingData = currentDayData.find(s => s.name === subjectName);
+                newDayData.push(existingData || { name: subjectName, hours: 1, completed: false, subTasks: [], status: 'None' });
+            });
+            state.studyData[dateKey] = newDayData;
+            closeModal();
+            render();
+            saveState();
+        },
+        confirmRandomize: () => {
+            const selectedOption = document.querySelector('input[name="subject-count"]:checked');
+            if (selectedOption) {
+                const num = parseInt(selectedOption.value, 10);
+                const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random());
+                const randomSubjects = shuffled.slice(0, num);
+                const dateKey = formatDateKey(new Date());
+                state.studyData[dateKey] = randomSubjects.map(subject => ({ name: subject, hours: 1, completed: false, subTasks: [], status: 'None' }));
+                closeModal();
+                render();
+                saveState();
+            }
+        },
+        confirmEditHours: () => {
+            const subjectName = DOM.hoursInput.dataset.subjectName;
+            const newHours = parseFloat(DOM.hoursInput.value);
+            if (subjectName && !isNaN(newHours) && newHours >= 0.5) {
+                const dateKey = formatDateKey(new Date());
+                const subject = state.studyData[dateKey]?.find(s => s.name === subjectName);
+                if (subject) {
+                    subject.hours = newHours;
+                }
+                closeModal();
+                render();
+                saveState();
+            } else {
+                DOM.hoursInput.classList.add('border-red-500');
+                setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500);
+            }
+        },
+        
+        // In-App Actions
+        toggleMainSubjectCompletion: (el) => {
+            const dateKey = formatDateKey(new Date());
+            const subject = state.studyData[dateKey]?.find(s => s.name === el.dataset.subjectName);
+            if (subject) {
+                subject.completed = !subject.completed;
+                subject.subTasks.forEach(t => t.completed = subject.completed);
+                render();
+                saveState();
+            }
+        },
+        toggleSubTaskPanel: (el) => {
+            const subjectName = el.dataset.subjectName;
+            if (state.ui.openSubTaskPanels.has(subjectName)) {
+                state.ui.openSubTaskPanels.delete(subjectName);
+            } else {
+                state.ui.openSubTaskPanels.add(subjectName);
+            }
+            renderSubjects();
+        },
+        addSubTaskOnEnter: (el) => {
+            const dateKey = formatDateKey(new Date());
+            const subject = state.studyData[dateKey]?.find(s => s.name === el.dataset.subjectName);
+            if (subject) {
+                subject.subTasks.push({ text: el.value.trim(), completed: false });
+                el.value = '';
+                render();
+                saveState();
+            }
+        },
+        toggleSubTaskCompletion: (el) => {
+            const { subjectName, taskIndex } = el.dataset;
+            const dateKey = formatDateKey(new Date());
+            const subject = state.studyData[dateKey]?.find(s => s.name === subjectName);
+            if (subject && subject.subTasks[taskIndex]) {
+                subject.subTasks[taskIndex].completed = !subject.subTasks[taskIndex].completed;
+                render();
+                saveState();
+            }
+        },
+        deleteSubTask: (el) => {
+            const { subjectName, taskIndex } = el.dataset;
+            const dateKey = formatDateKey(new Date());
+            const subject = state.studyData[dateKey]?.find(s => s.name === subjectName);
+            if (subject) {
+                subject.subTasks.splice(taskIndex, 1);
+                render();
+                saveState();
+            }
+        },
+        cycleSubjectStatus: (el) => {
+            const { subjectName } = el.dataset;
+            const dateKey = formatDateKey(new Date());
+            const subject = state.studyData[dateKey]?.find(s => s.name === subjectName);
+            if(subject){
+                const currentStatusIndex = ACTIVITY_TYPES.indexOf(subject.status || 'None');
+                const nextStatusIndex = (currentStatusIndex + 1) % ACTIVITY_TYPES.length;
+                subject.status = ACTIVITY_TYPES[nextStatusIndex];
+                render();
+                saveState();
+            }
+        },
+        confirmEndTime: () => {
+            state.settings.sessionEndTime = DOM.sessionEndTimeInput.value;
+            closeModal();
+            render();
+            saveState();
+        },
+    };
+
+    // Event Delegation
+    document.body.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-action]');
+        if (target && actions[target.dataset.action]) {
+            actions[target.dataset.action](target);
+        }
+    });
+    
+    document.body.addEventListener('keydown', (e) => {
+        const target = e.target.closest('[data-action-on-enter]');
+        if (target && e.key === 'Enter' && actions[target.dataset.actionOnEnter]) {
+            e.preventDefault();
+            actions[target.dataset.actionOnEnter](target, e);
+        }
+    });
+
+    // Drag and Drop Logic
+    document.body.addEventListener('dragstart', (e) => {
+        const subjectEl = e.target.closest('[data-subject-name]');
+        if (subjectEl) {
+            state.ui.draggedSubjectName = subjectEl.dataset.subjectName;
+            e.dataTransfer.effectAllowed = 'move';
+            subjectEl.classList.add('dragging');
+        }
+    });
+
+    document.body.addEventListener('dragend', (e) => {
+        const subjectEl = e.target.closest('[data-subject-name]');
+        if (subjectEl) subjectEl.classList.remove('dragging');
+        state.ui.draggedSubjectName = null;
+    });
+    
+    document.body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dropTarget = e.target.closest('[data-subject-name]');
+        if (dropTarget && dropTarget.dataset.subjectName !== state.ui.draggedSubjectName) {
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            dropTarget.classList.add('drag-over');
+        }
+    });
+    
+    document.body.addEventListener('dragleave', (e) => {
+        const dropTarget = e.target.closest('[data-subject-name]');
+        if(dropTarget) dropTarget.classList.remove('drag-over');
+    });
+
+    document.body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const droppedOnEl = e.target.closest('[data-subject-name]');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        if (droppedOnEl) {
+            const dateKey = formatDateKey(new Date());
+            const subjects = state.studyData[dateKey];
+            const fromIndex = subjects.findIndex(s => s.name === state.ui.draggedSubjectName);
+            const toIndex = subjects.findIndex(s => s.name === droppedOnEl.dataset.subjectName);
+            if (fromIndex > -1 && toIndex > -1) {
+                const [removed] = subjects.splice(fromIndex, 1);
+                subjects.splice(toIndex, 0, removed);
+                render();
+                saveState();
+            }
+        }
+    });
+    
+    // Helper function for creating icons
+    const createDragIcon = () => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>`;
+
+    // ===============================================
+    // INITIALIZATION
+    // ===============================================
+    const init = () => {
+        loadState();
+        render();
+    };
+
+    init();
+});
+</script>
+</body>
+</html>
+
