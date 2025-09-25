@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family/Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* THEME & COLOR SYSTEM */
@@ -79,7 +79,6 @@
         .status-practice { background-color: rgba(249, 115, 22, 0.1); color: #f97316; }
         .status-test { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
         
-        /* New styles for Schedule Generator */
         .option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.75rem; }
         .option-item {
             padding: 0.75rem; border: 2px solid var(--border-primary); border-radius: 0.5rem;
@@ -333,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     };
 
-    // MODIFICATION: Time is now larger and clickable. Pencil button removed.
+    // MODIFICATION: Time is now larger (text-base), clickable, and the pencil button is removed.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
@@ -345,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
                     <div class="flex-grow min-w-0">
                         <div class="flex items-center gap-2">
-                            <span data-action="editStartTime" data-item-id="${subject.id}" title="Click to edit start time" class="time-display font-bold text-lg text-main cursor-pointer" style="color: var(--accent-primary);">${formatTime(subject.startTime)}</span>
+                            <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display font-bold text-main text-base cursor-pointer hover:opacity-75 transition-opacity" style="color: var(--accent-primary);">${formatTime(subject.startTime)}</span>
                             <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
                         </div>
                     </div>
@@ -422,4 +421,150 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const setupThemeModal = () => { const a = [ { n: 'green', c: '#22c55e' }, { n: 'blue', c: '#3b82f6' }, { n: 'purple', c: '#a855f7' }, { n: 'red', c: '#ef4444' } ]; DOM.themeOptions.innerHTML = `<div><h5 class="text-sm font-bold text-subtle mb-3">Theme</h5><div class="grid grid-cols-2 gap-4"><button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme==='light'?'border-2 border-main':''}" style="${state.settings.theme==='light'?'border-color: var(--accent-primary)':''}">Light</button><button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme==='dark'?'border-2 border-main':''}" style="${state.settings.theme==='dark'?'border-color: var(--accent-primary)':''}
+    const setupThemeModal = () => { const a = [ { n: 'green', c: '#22c55e' }, { n: 'blue', c: '#3b82f6' }, { n: 'purple', c: '#a855f7' }, { n: 'red', c: '#ef4444' } ]; DOM.themeOptions.innerHTML = `<div><h5 class="text-sm font-bold text-subtle mb-3">Theme</h5><div class="grid grid-cols-2 gap-4"><button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme==='light'?'border-2 border-main':''}" style="${state.settings.theme==='light'?'border-color: var(--accent-primary)':''}">Light</button><button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme==='dark'?'border-2 border-main':''}" style="${state.settings.theme==='dark'?'border-color: var(--accent-primary)':''}">Dark</button></div></div><div><h5 class="text-sm font-bold text-subtle mb-3">Accent</h5><div class="flex items-center justify-around gap-4">${a.map(x=>`<button data-action="setAccent" data-accent="${x.n}" class="w-12 h-12 rounded-full ${state.settings.accent===x.n?'ring-2 ring-offset-2 ring-offset-bg-main':''}" style="background-color:${x.c}; ${state.settings.accent===x.n?'border-color: var(--accent-primary)':''}"></button>`).join('')}</div></div>`; };
+    
+    const setupGenerateScheduleModal = () => {
+        state.scheduleParams = { startTime: null, subjectCount: null, defaultDuration: null };
+        const createOptionItems = (container, options, dataAttr, settingKey) => { container.innerHTML = options.map(opt => `<div class="option-item" data-action="handleOptionSelection" data-${dataAttr}="${opt.value}" data-setting-key="${settingKey}">${opt.label}</div>`).join(''); };
+        const timeOptions = [];
+        for (let i = 6; i <= 16; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); }
+        createOptionItems(DOM.startTimeSelection, timeOptions, 'time', 'startTime');
+        createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration');
+        createOptionItems(DOM.subjectCountSelection, Array.from({ length: state.masterSubjects.length }, (_, i) => ({ label: i + 1, value: i + 1 })), 'count', 'subjectCount');
+        DOM.confirmGenerateBtn.disabled = true;
+    };
+
+    const actions = {
+        toggleSidebar: () => { const isOpen = DOM.sidebar.classList.contains('open'); if (isOpen) { DOM.sidebar.classList.remove('open'); DOM.sidebarOverlay.classList.add('opacity-0'); setTimeout(() => DOM.sidebarOverlay.classList.add('hidden'), 300); } else { DOM.sidebarOverlay.classList.remove('hidden'); setTimeout(() => { DOM.sidebar.classList.add('open'); DOM.sidebarOverlay.classList.remove('opacity-0'); }, 10); } },
+        openModal: (el) => openModal(el.dataset.modal, el.dataset.itemId),
+        closeModal: () => closeModal(),
+        setTheme: (el) => { state.settings.theme = el.dataset.theme; setupThemeModal(); render(); saveState(); },
+        setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); saveState(); },
+        addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); saveState(); } },
+        deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); saveState(); },
+        
+        // MODIFICATION: Logic updated to work with the time span as the trigger element.
+        editStartTime: (el) => {
+            const itemId = el.dataset.itemId;
+            const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
+            if (!item) return;
+
+            const timeDisplaySpan = el; // The element that was clicked IS the span
+            const container = el.parentElement;
+
+            const input = document.createElement('input');
+            input.type = 'time';
+            input.className = 'input-main text-sm p-0.5 w-24 rounded-md';
+            input.value = formatTimeTo24hr(item.startTime);
+
+            timeDisplaySpan.style.display = 'none';
+            container.prepend(input);
+            input.focus();
+
+            const saveTime = () => {
+                const [newHour, newMinute] = input.value.split(':');
+                if (newHour && newMinute) {
+                    item.startTime.setHours(parseInt(newHour), parseInt(newMinute));
+                    const schedule = state.studyData[formatDateKey(new Date())];
+                    const itemIndex = schedule.findIndex(i => i.id == itemId);
+                    recalculateStartTimes(itemIndex + 1);
+                    saveState();
+                }
+                render(); 
+            };
+
+            input.addEventListener('blur', saveTime);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') input.blur();
+                if (e.key === 'Escape') {
+                    input.removeEventListener('blur', saveTime);
+                    render();
+                }
+            });
+        },
+
+        confirmEditSubjects: () => {
+            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
+            let newSchedule = schedule.filter(item => item.type === 'break' || selectedNames.includes(item.name));
+            const currentNames = newSchedule.map(item => item.name);
+            selectedNames.forEach(name => { if (!currentNames.includes(name)) { newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: 1, completed: false, subTasks: [], startTime: null }); } });
+            state.studyData[key] = newSchedule;
+            recalculateStartTimes(); closeModal(); render(); saveState();
+        },
+
+        confirmEditHours: (el) => {
+            const itemId = DOM.hoursInput.dataset.itemId;
+            const value = parseFloat(DOM.hoursInput.value);
+            if (itemId && !isNaN(value) && value >= 0) {
+                const key = formatDateKey(new Date());
+                const schedule = state.studyData[key] || [];
+                const item = schedule.find(s => s.id == itemId);
+                if (item) {
+                    if (item.type === 'break') {
+                        item.durationHours = value / 60; 
+                    } else {
+                        item.durationHours = value;
+                    }
+                    if (item.type === 'subject') distributeSubTaskHours(item);
+                    const itemIndex = schedule.indexOf(item);
+                    recalculateStartTimes(itemIndex + 1);
+                }
+                closeModal(); render(); saveState();
+            } else {
+                DOM.hoursInput.classList.add('border-red-500');
+                setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500);
+            }
+        },
+        toggleMainCompletion: (el) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (item) { item.completed = !item.completed; if(item.type === 'subject') item.subTasks.forEach(t => t.completed = item.completed); render(); saveState(); } },
+        toggleSubTaskPanel: (el) => { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if(subject) { const n = subject.name; if (state.ui.openSubTaskPanels.has(n)) state.ui.openSubTaskPanels.delete(n); else state.ui.openSubTaskPanels.add(n); renderSubjects(); saveState();} },
+        addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); saveState(); } },
+        toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); saveState(); } },
+        deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); saveState(); } },
+        cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); saveState(); } },
+        confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); saveState(); },
+        resetApp: () => { if (confirm("Are you sure? This will delete all subjects and schedules.")) { localStorage.removeItem('studyPlannerState'); window.location.reload(); } },
+        handleOptionSelection: (el) => {
+            const { settingKey } = el.dataset; const value = el.dataset[Object.keys(el.dataset).find(k => k !== 'action' && k !== 'settingKey')]; const isNumeric = settingKey !== 'startTime';
+            state.scheduleParams[settingKey] = isNumeric ? parseFloat(value) : value;
+            const container = el.parentElement; container.querySelectorAll('.option-item').forEach(child => child.classList.remove('selected')); el.classList.add('selected');
+            DOM.confirmGenerateBtn.disabled = !(state.scheduleParams.startTime && state.scheduleParams.subjectCount && state.scheduleParams.defaultDuration);
+        },
+        confirmGenerateSchedule: () => {
+            const { startTime, subjectCount, defaultDuration } = state.scheduleParams; if (!startTime || !subjectCount || !defaultDuration) return;
+            const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const randomSubjects = shuffled.slice(0, subjectCount);
+            const [hour, minute] = startTime.split(':'); const scheduleStartTime = new Date(); scheduleStartTime.setHours(parseInt(hour), parseInt(minute), 0, 0);
+            const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null }));
+            if(newSchedule.length > 0) newSchedule[0].startTime = scheduleStartTime;
+            state.studyData[formatDateKey(new Date())] = newSchedule; recalculateStartTimes(1);
+            closeModal(); render(); saveState();
+        },
+        addBreak: () => {
+            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; if (schedule.length === 0) { alert("Generate a schedule first!"); return; }
+            let insertionIndex = schedule.findIndex(item => !item.completed); if (insertionIndex === -1) insertionIndex = schedule.length;
+            const newBreak = { id: Date.now() + Math.random(), type: 'break', durationHours: 15 / 60, completed: false, startTime: null };
+            schedule.splice(insertionIndex, 0, newBreak); recalculateStartTimes(insertionIndex);
+            render(); saveState();
+        },
+        deleteItem: (el) => {
+            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId);
+            if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); saveState(); }
+        },
+    };
+
+    document.body.addEventListener('click', (e) => { const t = e.target.closest('[data-action]'); if (t && actions[t.dataset.action]) actions[t.dataset.action](t); });
+    document.body.addEventListener('keydown', (e) => { const t = e.target.closest('[data-action-on-enter]'); if (t && e.key === 'Enter' && actions[t.dataset.actionOnEnter]) { e.preventDefault(); actions[t.dataset.actionOnEnter](t, e); } });
+    
+    document.body.addEventListener('dragstart', (e) => { const t = e.target.closest('[data-item-id]'); if (t) { state.ui.draggedItemId = t.dataset.itemId; e.dataTransfer.effectAllowed = 'move'; t.classList.add('dragging'); } });
+    document.body.addEventListener('dragend', (e) => { const t = document.querySelector('.dragging'); if (t) t.classList.remove('dragging'); state.ui.draggedItemId = null; });
+    document.body.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); if (t && t.dataset.itemId !== state.ui.draggedItemId) { document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); t.classList.add('drag-over'); } });
+    document.body.addEventListener('dragleave', (e) => { const t = e.target.closest('[data-item-id]'); if(t) t.classList.remove('drag-over'); });
+    document.body.addEventListener('drop', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); if (t) { const schedule = state.studyData[formatDateKey(new Date())]; const from = schedule.findIndex(s => s.id == state.ui.draggedItemId); const to = schedule.findIndex(s => s.id == t.dataset.itemId); if (from > -1 && to > -1) { const [removed] = schedule.splice(from, 1); schedule.splice(to, 0, removed); recalculateStartTimes(Math.min(from, to)); render(); saveState(); } } });
+    
+    const createDragIcon = () => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>`;
+    
+    const init = () => { loadState(); render(); };
+    init();
+});
+</script>
+</body>
+</html>
