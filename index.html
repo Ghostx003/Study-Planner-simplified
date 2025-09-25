@@ -334,7 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     };
 
-    // MODIFICATION: Time/Subject layout is now responsive (flex-col sm:flex-row) and time doesn't wrap.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
@@ -559,7 +558,39 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('dragend', (e) => { const t = document.querySelector('.dragging'); if (t) t.classList.remove('dragging'); state.ui.draggedItemId = null; });
     document.body.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); if (t && t.dataset.itemId !== state.ui.draggedItemId) { document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); t.classList.add('drag-over'); } });
     document.body.addEventListener('dragleave', (e) => { const t = e.target.closest('[data-item-id]'); if(t) t.classList.remove('drag-over'); });
-    document.body.addEventListener('drop', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); if (t) { const schedule = state.studyData[formatDateKey(new Date())]; const from = schedule.findIndex(s => s.id == state.ui.draggedItemId); const to = schedule.findIndex(s => s.id == t.dataset.itemId); if (from > -1 && to > -1) { const [removed] = schedule.splice(from, 1); schedule.splice(to, 0, removed); recalculateStartTimes(Math.min(from, to)); render(); saveState(); } } });
+    
+    // MODIFICATION: Rewritten drop handler to reshuffle subjects into existing time slots.
+    document.body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const t = e.target.closest('[data-item-id]');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        if (t && state.ui.draggedItemId) {
+            const schedule = state.studyData[formatDateKey(new Date())];
+            const fromIndex = schedule.findIndex(s => s.id == state.ui.draggedItemId);
+            const toIndex = schedule.findIndex(s => s.id == t.dataset.itemId);
+
+            if (fromIndex > -1 && toIndex > -1 && fromIndex !== toIndex) {
+                // 1. Create a snapshot of the time/duration slots BEFORE reordering.
+                const timeSlots = schedule.map(item => ({
+                    startTime: item.startTime,
+                    durationHours: item.durationHours
+                }));
+
+                // 2. Reorder the array by moving the item object.
+                const [draggedItem] = schedule.splice(fromIndex, 1);
+                schedule.splice(toIndex, 0, draggedItem);
+
+                // 3. Re-assign the times and durations from the snapshot to the newly ordered items.
+                schedule.forEach((item, index) => {
+                    item.startTime = timeSlots[index].startTime;
+                    item.durationHours = timeSlots[index].durationHours;
+                });
+
+                render();
+                saveState();
+            }
+        }
+    });
     
     const createDragIcon = () => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>`;
     
