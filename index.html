@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const createSubjectHTML = (subject) => {
-        const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
+        const isPanelOpen = state.ui.openSubTaskPanels.has(subject.id);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
         const progress = subject.completed ? 100 : subTaskProgress;
         const endTime = calculateEndTime(subject.startTime, subject.durationHours);
@@ -377,7 +377,18 @@ document.addEventListener('DOMContentLoaded', () => {
         subject.subTasks.forEach((task, index) => { 
             html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-item-id="${subject.id}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-item-id="${subject.id}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-item-id="${subject.id}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`; 
         }); 
-        html += `</div><div class="flex items-center mt-4"><input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary"></div>`; 
+        html += `</div>
+                 <div class="flex items-center justify-between mt-4 gap-2">
+                     <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary flex-grow">
+                     <div class="flex-shrink-0 flex items-center gap-2">
+                        <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs">
+                             <i class="fas fa-copy mr-1"></i> Duplicate
+                        </button>
+                        <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);">
+                            <i class="fas fa-trash-alt mr-1"></i> Delete
+                        </button>
+                     </div>
+                 </div>`; 
         return html; 
     };
     
@@ -535,35 +546,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const sessionStartTime = originalSchedule[0].startTime;
             const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
 
-            let scheduleWithRemoved = originalSchedule.filter(item =>
+            let newSchedule = originalSchedule.filter(item =>
                 item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))
             );
-            
-            let finalSchedule = [];
-            let itemsToAdd = [...selectedNames];
 
-            originalSchedule.forEach(originalItem => {
-                if(selectedNames.includes(originalItem.name) && itemsToAdd.includes(originalItem.name)) {
-                    finalSchedule.push(originalItem);
-                    itemsToAdd = itemsToAdd.filter(name => name !== originalItem.name);
-                } else if (originalItem.type === 'break') {
-                    finalSchedule.push(originalItem);
+            const currentNames = newSchedule.map(item => item.name);
+
+            selectedNames.forEach(name => {
+                if (!currentNames.includes(name)) {
+                    newSchedule.push({
+                        id: Date.now() + Math.random(),
+                        type: 'subject',
+                        name,
+                        durationHours: state.settings.defaultDuration || 1,
+                        completed: false,
+                        subTasks: [],
+                        startTime: null
+                    });
                 }
             });
-            
-            itemsToAdd.forEach(name => {
-                finalSchedule.push({
-                    id: Date.now() + Math.random(), type: 'subject', name,
-                    durationHours: state.settings.defaultDuration || 1,
-                    completed: false, subTasks: [], startTime: null
-                });
-            });
 
-            if (finalSchedule.length > 0) {
-                finalSchedule[0].startTime = sessionStartTime;
+            if (newSchedule.length > 0) {
+                newSchedule[0].startTime = sessionStartTime;
             }
 
-            state.studyData[key] = finalSchedule;
+            state.studyData[key] = newSchedule;
             recalculateStartTimes(1);
 
             closeModal();
@@ -595,11 +602,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         },
         toggleMainCompletion: (el) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (item) { item.completed = !item.completed; if(item.type === 'subject') item.subTasks.forEach(t => t.completed = item.completed); render(); saveState(); } },
-        toggleSubTaskPanel: (el) => { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if(subject) { const n = subject.name; if (state.ui.openSubTaskPanels.has(n)) state.ui.openSubTaskPanels.delete(n); else state.ui.openSubTaskPanels.add(n); renderSubjects(); saveState();} },
+        toggleSubTaskPanel: (el) => { 
+            const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); 
+            if(subject) { 
+                const id = subject.id; 
+                if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); 
+                else state.ui.openSubTaskPanels.add(id); 
+                renderSubjects(); 
+                saveState();
+            } 
+        },
         addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); saveState(); } },
         toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); saveState(); } },
         deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); saveState(); } },
         cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); saveState(); } },
+        duplicateSubject: (el) => {
+            const { itemId } = el.dataset;
+            const key = formatDateKey(new Date());
+            const schedule = state.studyData[key] || [];
+            const originalSubject = schedule.find(s => s.id == itemId);
+
+            if (originalSubject) {
+                const newDuplicate = {
+                    id: Date.now() + Math.random(),
+                    type: 'subject',
+                    name: originalSubject.name,
+                    durationHours: originalSubject.durationHours,
+                    completed: false,
+                    subTasks: [],
+                    startTime: null
+                };
+                schedule.push(newDuplicate);
+                recalculateStartTimes(schedule.length - 1);
+                render();
+                saveState();
+            }
+        },
         confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); saveState(); },
         resetApp: () => { if (confirm("Are you sure? This will delete all subjects and schedules.")) { localStorage.removeItem('studyPlannerState'); window.location.reload(); } },
         handleOptionSelection: (el) => {
