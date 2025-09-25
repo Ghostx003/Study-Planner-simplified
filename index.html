@@ -428,9 +428,9 @@ document.addEventListener('DOMContentLoaded', () => {
         state.scheduleParams = { startTime: null, subjectCount: null, defaultDuration: null };
         const createOptionItems = (container, options, dataAttr, settingKey) => { container.innerHTML = options.map(opt => `<div class="option-item" data-action="handleOptionSelection" data-${dataAttr}="${opt.value}" data-setting-key="${settingKey}">${opt.label}</div>`).join(''); };
         const timeOptions = [];
-        for (let i = 6; i <= 16; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); }
+        for (let i = 6; i <= 21; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); }
         createOptionItems(DOM.startTimeSelection, timeOptions, 'time', 'startTime');
-        createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration');
+        createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3, 3.5 , 4 , 5].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration');
         createOptionItems(DOM.subjectCountSelection, Array.from({ length: state.masterSubjects.length }, (_, i) => ({ label: i + 1, value: i + 1 })), 'count', 'subjectCount');
         DOM.confirmGenerateBtn.disabled = true;
     };
