@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const createProgressCircle = (progress, textContent = '') => { 
         const size = 56; const sw = 6; const r = (size / 2) - (sw / 2); const circ = 2 * Math.PI * r; const o = circ - (progress / 100) * circ;
         const text = textContent ? `<text x="50%" y="50%" dy=".3em" text-anchor="middle" class="text-[11px] font-bold" fill="var(--text-primary)">${textContent}</text>` : ''; 
-        return `<svg class="w-14 h-14 flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle>${text}</svg>`; 
+        return `<svg class="w-full h-full flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle>${text}</svg>`; 
     };
     
     const render = () => { document.documentElement.setAttribute('data-theme', state.settings.theme); document.documentElement.setAttribute('data-accent', state.settings.accent); const today = new Date(); DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); renderSubjects(); renderProgress(); renderCountdown(); };
@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeRangeString = `${formatTime(subject.startTime)} - ${formatTime(endTime)}`;
         return `
             <div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-item-id="${subject.id}">
-                <div class="flex items-center p-3 sm:p-4 gap-3">
+                <div class="flex items-center p-3 sm:p-4 gap-2 sm:gap-3">
                     <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
                     <div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
                     <div class="flex-grow min-w-0">
@@ -359,11 +359,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-semibold text-sm cursor-pointer" style="color: var(--accent-primary);">${timeRangeString}</span>
                     </div>
-                    <div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer" title="Edit time for ${subject.name}">
+                    <div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer w-12 h-12 sm:w-14 sm:h-14" title="Edit time for ${subject.name}">
                         ${createProgressCircle(progress, formatHoursAndMinutesCompact(subject.durationHours))}
                     </div>
                     <button data-action="toggleSubTaskPanel" data-item-id="${subject.id}" class="p-1 rounded-full hover:bg-border-primary transition-colors">
-                        <svg class="w-6 h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </button>
                 </div>
                 <div class="subtask-container px-4 pb-4 border-t border-secondary ${isPanelOpen ? '' : 'hidden'}">
