@@ -160,7 +160,6 @@
             <div class="p-6 pb-4 flex-shrink-0">
                 <h4 class="text-xl font-bold text-main">Generate a New Schedule</h4>
             </div>
-
             <div class="px-6 space-y-6 overflow-y-auto flex-grow">
                 <div>
                     <h5 class="text-sm font-bold text-subtle mb-2">1. When do you want to start?</h5>
@@ -175,7 +174,6 @@
                     <div id="subject-count-selection" class="option-grid"></div>
                 </div>
             </div>
-
             <div class="flex justify-end space-x-3 p-6 pt-4 mt-auto flex-shrink-0 border-t border-secondary">
                 <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
                 <button data-action="confirmGenerateSchedule" id="confirm-generate-btn" class="btn btn-primary" disabled>Create Schedule</button>
@@ -196,7 +194,6 @@
     </div></div>
     
 <script>
-// The script content remains the same. No JavaScript changes were needed for this layout fix.
 document.addEventListener('DOMContentLoaded', () => {
 
     const state = {
@@ -337,6 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
     };
 
+    // MODIFICATION: Time/Subject layout is now responsive (flex-col sm:flex-row) and time doesn't wrap.
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
@@ -347,8 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
                     <div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
                     <div class="flex-grow min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display font-bold text-main text-base cursor-pointer hover:opacity-75 transition-opacity" style="color: var(--accent-primary);">${formatTime(subject.startTime)}</span>
+                        <div class="flex flex-col items-start sm:flex-row sm:items-center sm:gap-2">
+                            <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-bold text-main text-base cursor-pointer hover:opacity-75 transition-opacity" style="color: var(--accent-primary);">${formatTime(subject.startTime)}</span>
                             <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
                         </div>
                     </div>
