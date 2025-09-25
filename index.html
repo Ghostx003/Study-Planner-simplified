@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         masterSubjects: [],
         studyData: {},
-        settings: { theme: 'dark', accent: 'green', sessionEndTime: null },
+        settings: { theme: 'dark', accent: 'green', sessionEndTime: null, defaultDuration: 1 },
         ui: { currentModal: null, openSubTaskPanels: new Set(), draggedItemId: null },
         scheduleParams: { startTime: null, subjectCount: null, defaultDuration: null }
     };
@@ -234,8 +234,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!item.type) item.type = 'subject';
                     if (item.type === 'subject') {
                          if (item.subTasks && item.subTasks.length > 0) {
-                            item.subTasks.forEach(task => { if (task.status === undefined) task.status = 'None'; });
-                        }
+                             item.subTasks.forEach(task => { if (task.status === undefined) task.status = 'None'; });
+                         }
+                    } else if (item.type === 'break' && typeof item.text === 'undefined') {
+                        item.text = 'Break'; // Add default text for backward compatibility
                     }
                     if (item.startTime) item.startTime = new Date(item.startTime);
                 });
@@ -264,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = formatDateKey(new Date());
         const schedule = state.studyData[key] || [];
         if (schedule.length === 0) return;
+
         for (let i = startIndex; i < schedule.length; i++) {
             if (i > 0) {
                 const prevItem = schedule[i - 1];
@@ -322,13 +325,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     const createBreakHTML = (item) => {
+        const endTime = calculateEndTime(item.startTime, item.durationHours);
+        const timeRangeString = `${formatTime(item.startTime)} - ${formatTime(endTime)}`;
         return `
-            <div class="break-item rounded-xl p-3 sm:p-4 flex items-center justify-between gap-3 border border-secondary shadow-sm ${item.completed ? 'completed opacity-60' : ''}" data-item-id="${item.id}">
-                 <div data-action="toggleMainCompletion" data-item-id="${item.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${item.completed ? 'completed' : ''}"></div>
-                <div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${item.id}" class="flex items-center gap-3 flex-grow text-center justify-center cursor-pointer" title="Edit break duration">
+            <div class="break-item rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-secondary shadow-sm ${item.completed ? 'completed opacity-60' : ''}" data-item-id="${item.id}" draggable="true">
+                <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
+                <div data-action="toggleMainCompletion" data-item-id="${item.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${item.completed ? 'completed' : ''}"></div>
+                <div class="flex items-center gap-2 flex-grow min-w-0">
                     <i class="fas fa-coffee text-xl text-subtle"></i>
-                    <span class="font-bold text-main">Break</span>
-                    <span class="text-sm text-subtle">(${formatHoursAndMinutes(item.durationHours)})</span>
+                    <div class="flex flex-col items-start">
+                        <span class="font-bold text-main cursor-pointer hover:opacity-75 truncate" data-action="editBreakText" data-item-id="${item.id}" title="Click to edit reason">${item.text || 'Break'}</span>
+                        <span class="text-sm text-subtle" title="Click to edit duration" data-action="openModal" data-modal="edit-hours-modal" data-item-id="${item.id}">${timeRangeString} (${formatHoursAndMinutes(item.durationHours)})</span>
+                    </div>
                 </div>
                 <button data-action="deleteItem" data-item-id="${item.id}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button>
             </div>`;
@@ -338,16 +346,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.name);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
         const progress = subject.completed ? 100 : subTaskProgress;
+        const endTime = calculateEndTime(subject.startTime, subject.durationHours);
+        const timeRangeString = `${formatTime(subject.startTime)} - ${formatTime(endTime)}`;
         return `
             <div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-item-id="${subject.id}">
                 <div class="flex items-center p-3 sm:p-4 gap-3">
                     <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
                     <div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
                     <div class="flex-grow min-w-0">
-                        <div class="flex flex-col items-start sm:flex-row sm:items-center sm:gap-2">
-                            <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-bold text-main text-base cursor-pointer hover:opacity-75 transition-opacity" style="color: var(--accent-primary);">${formatTime(subject.startTime)}</span>
+                        <div class="flex items-center gap-3">
                             <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
                         </div>
+                        <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-semibold text-sm cursor-pointer" style="color: var(--accent-primary);">${timeRangeString}</span>
                     </div>
                     <div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer" title="Edit time for ${subject.name}">
                         ${createProgressCircle(progress, formatHoursAndMinutesCompact(subject.durationHours))}
@@ -457,8 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
             input.className = 'input-main text-sm p-0.5 w-24 rounded-md';
             input.value = formatTimeTo24hr(item.startTime);
 
-            timeDisplaySpan.style.display = 'none';
-            container.prepend(input);
+            container.replaceChild(input, timeDisplaySpan);
             input.focus();
 
             const saveTime = () => {
@@ -483,13 +492,83 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         },
 
+        editBreakText: (el) => {
+            const itemId = el.dataset.itemId;
+            const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
+            if (!item || item.type !== 'break') return;
+
+            const container = el.parentElement;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow';
+            input.value = item.text || 'Break';
+
+            container.replaceChild(input, el);
+            input.focus();
+            input.select();
+
+            const saveAndExit = () => {
+                const newText = input.value.trim();
+                item.text = newText || 'Break';
+                saveState();
+                render();
+            };
+
+            input.addEventListener('blur', saveAndExit);
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') input.blur();
+                if (e.key === 'Escape') {
+                    input.removeEventListener('blur', saveAndExit);
+                    render();
+                }
+            });
+        },
+
         confirmEditSubjects: () => {
-            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
-            let newSchedule = schedule.filter(item => item.type === 'break' || selectedNames.includes(item.name));
-            const currentNames = newSchedule.map(item => item.name);
-            selectedNames.forEach(name => { if (!currentNames.includes(name)) { newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: 1, completed: false, subTasks: [], startTime: null }); } });
-            state.studyData[key] = newSchedule;
-            recalculateStartTimes(); closeModal(); render(); saveState();
+            const key = formatDateKey(new Date());
+            const originalSchedule = state.studyData[key] || [];
+            if (originalSchedule.length === 0) {
+                closeModal();
+                return;
+            }
+
+            const sessionStartTime = originalSchedule[0].startTime;
+            const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
+
+            let scheduleWithRemoved = originalSchedule.filter(item =>
+                item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))
+            );
+            
+            let finalSchedule = [];
+            let itemsToAdd = [...selectedNames];
+
+            originalSchedule.forEach(originalItem => {
+                if(selectedNames.includes(originalItem.name) && itemsToAdd.includes(originalItem.name)) {
+                    finalSchedule.push(originalItem);
+                    itemsToAdd = itemsToAdd.filter(name => name !== originalItem.name);
+                } else if (originalItem.type === 'break') {
+                    finalSchedule.push(originalItem);
+                }
+            });
+            
+            itemsToAdd.forEach(name => {
+                finalSchedule.push({
+                    id: Date.now() + Math.random(), type: 'subject', name,
+                    durationHours: state.settings.defaultDuration || 1,
+                    completed: false, subTasks: [], startTime: null
+                });
+            });
+
+            if (finalSchedule.length > 0) {
+                finalSchedule[0].startTime = sessionStartTime;
+            }
+
+            state.studyData[key] = finalSchedule;
+            recalculateStartTimes(1);
+
+            closeModal();
+            render();
+            saveState();
         },
 
         confirmEditHours: (el) => {
@@ -531,6 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         confirmGenerateSchedule: () => {
             const { startTime, subjectCount, defaultDuration } = state.scheduleParams; if (!startTime || !subjectCount || !defaultDuration) return;
+            state.settings.defaultDuration = defaultDuration;
             const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const randomSubjects = shuffled.slice(0, subjectCount);
             const [hour, minute] = startTime.split(':'); const scheduleStartTime = new Date(); scheduleStartTime.setHours(parseInt(hour), parseInt(minute), 0, 0);
             const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null }));
@@ -539,11 +619,25 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModal(); render(); saveState();
         },
         addBreak: () => {
-            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; if (schedule.length === 0) { alert("Generate a schedule first!"); return; }
-            let insertionIndex = schedule.findIndex(item => !item.completed); if (insertionIndex === -1) insertionIndex = schedule.length;
-            const newBreak = { id: Date.now() + Math.random(), type: 'break', durationHours: 15 / 60, completed: false, startTime: null };
-            schedule.splice(insertionIndex, 0, newBreak); recalculateStartTimes(insertionIndex);
-            render(); saveState();
+            const key = formatDateKey(new Date());
+            const schedule = state.studyData[key] || [];
+            if (schedule.length === 0) {
+                alert("Generate a schedule first!");
+                return;
+            }
+            let insertionIndex = schedule.findIndex(item => !item.completed);
+            if (insertionIndex === -1) insertionIndex = schedule.length;
+
+            const newBreak = { id: Date.now() + Math.random(), type: 'break', text: 'Break', durationHours: 15 / 60, completed: false, startTime: null };
+
+            if (insertionIndex === 0 && schedule.length > 0) {
+                newBreak.startTime = schedule[0].startTime;
+            }
+
+            schedule.splice(insertionIndex, 0, newBreak);
+            recalculateStartTimes(insertionIndex + 1);
+            render();
+            saveState();
         },
         deleteItem: (el) => {
             const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId);
@@ -559,32 +653,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); if (t && t.dataset.itemId !== state.ui.draggedItemId) { document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); t.classList.add('drag-over'); } });
     document.body.addEventListener('dragleave', (e) => { const t = e.target.closest('[data-item-id]'); if(t) t.classList.remove('drag-over'); });
     
-    // MODIFICATION: Rewritten drop handler to reshuffle subjects into existing time slots.
     document.body.addEventListener('drop', (e) => {
         e.preventDefault();
-        const t = e.target.closest('[data-item-id]');
+        const dropTarget = e.target.closest('[data-item-id]');
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        if (t && state.ui.draggedItemId) {
-            const schedule = state.studyData[formatDateKey(new Date())];
+
+        if (dropTarget && state.ui.draggedItemId && dropTarget.dataset.itemId !== state.ui.draggedItemId) {
+            const key = formatDateKey(new Date());
+            const schedule = state.studyData[key];
+            
+            const sessionAnchorTime = schedule.length > 0 ? new Date(schedule[0].startTime.getTime()) : null;
+
             const fromIndex = schedule.findIndex(s => s.id == state.ui.draggedItemId);
-            const toIndex = schedule.findIndex(s => s.id == t.dataset.itemId);
+            const toIndex = schedule.findIndex(s => s.id == dropTarget.dataset.itemId);
 
-            if (fromIndex > -1 && toIndex > -1 && fromIndex !== toIndex) {
-                // 1. Create a snapshot of the time/duration slots BEFORE reordering.
-                const timeSlots = schedule.map(item => ({
-                    startTime: item.startTime,
-                    durationHours: item.durationHours
-                }));
-
-                // 2. Reorder the array by moving the item object.
+            if (fromIndex !== -1 && toIndex !== -1) {
                 const [draggedItem] = schedule.splice(fromIndex, 1);
                 schedule.splice(toIndex, 0, draggedItem);
-
-                // 3. Re-assign the times and durations from the snapshot to the newly ordered items.
-                schedule.forEach((item, index) => {
-                    item.startTime = timeSlots[index].startTime;
-                    item.durationHours = timeSlots[index].durationHours;
-                });
+                
+                if (schedule.length > 0 && sessionAnchorTime) {
+                    schedule[0].startTime = sessionAnchorTime;
+                }
+                
+                recalculateStartTimes(1);
 
                 render();
                 saveState();
