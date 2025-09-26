@@ -10,6 +10,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         /* THEME & COLOR SYSTEM */
         :root {
@@ -91,6 +94,11 @@
         .break-item {
             background-color: var(--break-bg);
         }
+        /* P2P Status Indicator */
+        #p2p-status-indicator { width: 10px; height: 10px; border-radius: 50%; transition: background-color 0.3s; }
+        #p2p-status-indicator.disconnected { background-color: #ef4444; }
+        #p2p-status-indicator.connecting { background-color: #f97316; }
+        #p2p-status-indicator.connected { background-color: #22c55e; }
     </style>
 </head>
 
@@ -99,6 +107,9 @@
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-main shadow-xl p-4 z-50 border-r border-secondary">
         <h2 class="text-xl font-bold mb-6 text-main">Menu</h2>
         <nav><ul>
+            <li><button data-action="generateSyncCode" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Start Sync Session</button></li>
+            <li><button data-action="startScanToSync" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Scan to Sync</button></li>
+            <li><hr class="border-secondary my-2"></li>
             <li><button data-action="openModal" data-modal="manage-subjects-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Manage Subjects</button></li>
             <li><button data-action="openModal" data-modal="theme-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Customize Theme</button></li>
             <li><button data-action="openModal" data-modal="export-import-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Export / Import Data</button></li>
@@ -119,6 +130,9 @@
                     <button data-action="openModal" data-modal="generate-schedule-modal" class="btn btn-primary text-sm sm:hidden">
                         Generate
                     </button>
+                    <div id="p2p-status" class="flex items-center gap-2 pl-2 hidden">
+                        <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
+                    </div>
                 </div>
                 
                 <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
@@ -151,6 +165,26 @@
             </section>
         </div>
     </main>
+
+    <div id="qr-code-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs text-center">
+            <h4 class="text-xl font-bold mb-4 text-main">Scan to Sync</h4>
+            <p class="text-sm text-subtle mb-4">Scan this code with your other device to establish a real-time sync connection.</p>
+            <div id="qrcode-container" class="flex justify-center bg-white p-4 rounded-lg"></div>
+            <div class="flex justify-end mt-6">
+                <button data-action="closeModal" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+    <div id="qr-scanner-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h4 class="text-xl font-bold mb-4 text-main">Scan QR Code</h4>
+            <div id="qr-reader" class="w-full border border-main rounded-lg overflow-hidden"></div>
+            <div class="flex justify-end mt-6">
+                <button data-action="stopScanToSync" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <div id="theme-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-sm"><h4 class="text-xl font-bold mb-5 text-main">Customize Theme</h4><div id="theme-options" class="space-y-6"></div><div class="flex justify-end mt-6"><button data-action="closeModal" class="btn btn-secondary">Close</button></div></div></div>
     <div id="manage-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md"><h4 class="text-xl font-bold mb-2 text-main">Manage Subjects</h4><p class="text-sm text-subtle mb-4">Add or remove subjects from your master list.</p><div class="flex gap-2 mb-4"><input type="text" id="new-subject-input" placeholder="Add new subject..." class="w-full p-2 input-main"><button data-action="addMasterSubject" class="btn btn-primary">Add</button></div><div id="master-subjects-list" class="space-y-2 mb-6 max-h-64 overflow-y-auto border-y border-main py-3"></div><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Done</button></div></div></div>
@@ -224,8 +258,9 @@ document.addEventListener('DOMContentLoaded', () => {
         masterSubjects: [],
         studyData: {},
         settings: { theme: 'dark', accent: 'green', sessionEndTime: null, defaultDuration: 1 },
-        ui: { currentModal: null, openSubTaskPanels: new Set(), draggedItemId: null },
-        scheduleParams: { startTime: null, subjectCount: null, defaultDuration: null }
+        ui: { currentModal: null, openSubTaskPanels: new Set(), draggedItemId: null, isReceivingP2PUpdate: false },
+        scheduleParams: { startTime: null, subjectCount: null, defaultDuration: null },
+        p2p: { peer: null, connection: null, isConnected: false, scanner: null }
     };
 
     const ACTIVITY_TYPES = ['None', 'Lecture', 'Revision', 'Practice', 'Test'];
@@ -235,15 +270,114 @@ document.addEventListener('DOMContentLoaded', () => {
         editHoursSubjectName: document.getElementById('edit-hours-subject-name'),
         startTimeSelection: document.getElementById('start-time-selection'), defaultDurationSelection: document.getElementById('default-duration-selection'), subjectCountSelection: document.getElementById('subject-count-selection'), confirmGenerateBtn: document.getElementById('confirm-generate-btn'),
         importDataTextarea: document.getElementById('import-data-textarea'),
+        p2pStatus: document.getElementById('p2p-status'),
+        p2pStatusIndicator: document.getElementById('p2p-status-indicator'),
+        qrCodeContainer: document.getElementById('qrcode-container'),
+        qrReader: document.getElementById('qr-reader'),
     };
     
-    const saveState = () => localStorage.setItem('studyPlannerState', JSON.stringify(state));
+    // --- P2P SYNC LOGIC ---
+
+    const updateP2PStatus = (status) => {
+        DOM.p2pStatus.classList.remove('hidden');
+        DOM.p2pStatusIndicator.className = status;
+    };
+
+    const setupPeerListeners = (peer) => {
+        peer.on('open', (id) => console.log('My peer ID is: ' + id));
+
+        peer.on('connection', (conn) => {
+            console.log('Received incoming connection');
+            if (state.p2p.connection) {
+                state.p2p.connection.close(); // Close any existing connection
+            }
+            state.p2p.connection = conn;
+            setupConnectionListeners(conn, true); // This device is the host
+        });
+
+        peer.on('error', (err) => {
+            console.error('PeerJS error:', err);
+            updateP2PStatus('disconnected');
+        });
+    };
+
+    const setupConnectionListeners = (conn, isHost = false) => {
+        conn.on('open', () => {
+            console.log('Connection established with ' + conn.peer);
+            state.p2p.isConnected = true;
+            updateP2PStatus('connected');
+            closeModal(); 
+            // **FIX:** Only the host sends its state on initial connection to avoid a race condition.
+            if (isHost) {
+                broadcastState(); 
+            }
+        });
+
+        conn.on('data', (data) => {
+            if (data.type === 'state-update') {
+                state.ui.isReceivingP2PUpdate = true;
+                
+                state.masterSubjects = data.payload.masterSubjects;
+                state.settings = data.payload.settings;
+                state.studyData = data.payload.studyData;
+                
+                Object.values(state.studyData).forEach(day => {
+                    day.forEach(item => {
+                        if (item.startTime) item.startTime = new Date(item.startTime);
+                    });
+                });
+
+                saveState(); // Save the newly received state locally
+                render();    // Re-render the UI with the new state
+                
+                setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50);
+            }
+        });
+
+        conn.on('close', () => {
+            console.log('Connection closed.');
+            state.p2p.isConnected = false;
+            state.p2p.connection = null;
+            updateP2PStatus('disconnected');
+        });
+    };
+
+    const broadcastState = () => {
+        if (!state.p2p.connection || !state.p2p.isConnected || state.ui.isReceivingP2PUpdate) {
+            return;
+        }
+        const payload = {
+            masterSubjects: state.masterSubjects,
+            studyData: state.studyData,
+            settings: state.settings,
+        };
+        state.p2p.connection.send({ type: 'state-update', payload });
+    };
+
+    // This is now the primary way to save data, ensuring any change is also broadcast.
+    const enhancedSaveState = () => {
+        saveState();
+        broadcastState();
+    }
+    
+    // --- END P2P SYNC LOGIC ---
+    
+    const saveState = () => {
+        // **BUG FIX:** Create a copy of the state to save, and explicitly delete the p2p object
+        // from the copy. This prevents the "circular structure" error when trying to JSON.stringify
+        // the live connection object.
+        const stateToSave = { ...state };
+        delete stateToSave.p2p;
+        localStorage.setItem('studyPlannerState', JSON.stringify(stateToSave));
+    };
+
 
     const loadState = () => {
         const savedState = localStorage.getItem('studyPlannerState');
         if (savedState) {
             const parsedState = JSON.parse(savedState);
             Object.keys(parsedState).forEach(key => {
+                if (key === 'p2p') return; 
                 if (typeof parsedState[key] === 'object' && parsedState[key] !== null && !Array.isArray(parsedState[key])) {
                     state[key] = { ...state[key], ...parsedState[key] };
                 } else {
@@ -262,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
                              item.subTasks.forEach(task => { if (task.status === undefined) task.status = 'None'; });
                          }
                     } else if (item.type === 'break' && typeof item.text === 'undefined') {
-                        item.text = 'Break'; // Add default text for backward compatibility
+                        item.text = 'Break';
                     }
                     if (item.startTime) item.startTime = new Date(item.startTime);
                 });
@@ -482,30 +616,72 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const actions = {
+        // --- P2P ACTIONS ---
+        generateSyncCode: () => {
+            if (state.p2p.peer) state.p2p.peer.destroy();
+            const peer = new Peer();
+            state.p2p.peer = peer;
+            setupPeerListeners(peer);
+            
+            peer.on('open', (id) => {
+                DOM.qrCodeContainer.innerHTML = '';
+                const qr = qrcode(0, 'L');
+                qr.addData(id);
+                qr.make();
+                DOM.qrCodeContainer.innerHTML = qr.createImgTag(5);
+                openModal('qr-code-modal');
+                updateP2PStatus('connecting');
+            });
+        },
+        startScanToSync: () => {
+            if (state.p2p.peer) state.p2p.peer.destroy();
+            const peer = new Peer();
+            state.p2p.peer = peer;
+            setupPeerListeners(peer);
+
+            const onScanSuccess = (decodedText, decodedResult) => {
+                actions.stopScanToSync();
+                const conn = state.p2p.peer.connect(decodedText);
+                if (state.p2p.connection) {
+                    state.p2p.connection.close();
+                }
+                state.p2p.connection = conn;
+                setupConnectionListeners(conn, false); // This device is the client
+                updateP2PStatus('connecting');
+            };
+
+            const html5QrcodeScanner = new Html5Qrcode("qr-reader");
+            state.p2p.scanner = html5QrcodeScanner;
+            html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, (errorMessage) => {});
+            openModal('qr-scanner-modal');
+        },
+        stopScanToSync: () => {
+            if (state.p2p.scanner && state.p2p.scanner.isScanning) {
+                state.p2p.scanner.stop().then(() => {}).catch(err => {});
+            }
+            closeModal();
+        },
+        // --- END P2P ACTIONS ---
+
         toggleSidebar: () => { const isOpen = DOM.sidebar.classList.contains('open'); if (isOpen) { DOM.sidebar.classList.remove('open'); DOM.sidebarOverlay.classList.add('opacity-0'); setTimeout(() => DOM.sidebarOverlay.classList.add('hidden'), 300); } else { DOM.sidebarOverlay.classList.remove('hidden'); setTimeout(() => { DOM.sidebar.classList.add('open'); DOM.sidebarOverlay.classList.remove('opacity-0'); }, 10); } },
         openModal: (el) => openModal(el.dataset.modal, el.dataset.itemId),
         closeModal: () => closeModal(),
-        setTheme: (el) => { state.settings.theme = el.dataset.theme; setupThemeModal(); render(); saveState(); },
-        setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); saveState(); },
-        addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); saveState(); } },
-        deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); saveState(); },
+        setTheme: (el) => { state.settings.theme = el.dataset.theme; setupThemeModal(); render(); enhancedSaveState(); },
+        setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); enhancedSaveState(); },
+        addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); enhancedSaveState(); } },
+        deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); enhancedSaveState(); },
         
         editStartTime: (el) => {
             const itemId = el.dataset.itemId;
             const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
             if (!item) return;
-
-            const timeDisplaySpan = el;
             const container = el.parentElement;
-
             const input = document.createElement('input');
             input.type = 'time';
             input.className = 'input-main text-sm p-0.5 w-24 rounded-md';
             input.value = formatTimeTo24hr(item.startTime);
-
-            container.replaceChild(input, timeDisplaySpan);
+            container.replaceChild(input, el);
             input.focus();
-
             const saveTime = () => {
                 const [newHour, newMinute] = input.value.split(':');
                 if (newHour && newMinute) {
@@ -513,94 +689,59 @@ document.addEventListener('DOMContentLoaded', () => {
                     const schedule = state.studyData[formatDateKey(new Date())];
                     const itemIndex = schedule.findIndex(i => i.id == itemId);
                     recalculateStartTimes(itemIndex + 1);
-                    saveState();
+                    enhancedSaveState();
                 }
                 render(); 
             };
-
             input.addEventListener('blur', saveTime);
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') input.blur();
-                if (e.key === 'Escape') {
-                    input.removeEventListener('blur', saveTime);
-                    render();
-                }
+                if (e.key === 'Escape') { input.removeEventListener('blur', saveTime); render(); }
             });
         },
-
         editBreakText: (el) => {
             const itemId = el.dataset.itemId;
             const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
             if (!item || item.type !== 'break') return;
-
             const container = el.parentElement;
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow';
             input.value = item.text || 'Break';
-
             container.replaceChild(input, el);
             input.focus();
             input.select();
-
             const saveAndExit = () => {
                 const newText = input.value.trim();
                 item.text = newText || 'Break';
-                saveState();
+                enhancedSaveState();
                 render();
             };
-
             input.addEventListener('blur', saveAndExit);
             input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') input.blur();
-                if (e.key === 'Escape') {
-                    input.removeEventListener('blur', saveAndExit);
-                    render();
-                }
+                if (e.key === 'Escape') { input.removeEventListener('blur', saveAndExit); render(); }
             });
         },
-
         confirmEditSubjects: () => {
             const key = formatDateKey(new Date());
             const originalSchedule = state.studyData[key] || [];
-            if (originalSchedule.length === 0) {
-                closeModal();
-                return;
-            }
-
+            if (originalSchedule.length === 0) { closeModal(); return; }
             const sessionStartTime = originalSchedule[0].startTime;
             const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
-
-            let newSchedule = originalSchedule.filter(item =>
-                item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))
-            );
-
+            let newSchedule = originalSchedule.filter(item => item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name)));
             const currentNames = newSchedule.map(item => item.name);
-
             selectedNames.forEach(name => {
                 if (!currentNames.includes(name)) {
-                    newSchedule.push({
-                        id: Date.now() + Math.random(),
-                        type: 'subject',
-                        name,
-                        durationHours: state.settings.defaultDuration || 1,
-                        completed: false,
-                        subTasks: [],
-                        startTime: null
-                    });
+                    newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: state.settings.defaultDuration || 1, completed: false, subTasks: [], startTime: null });
                 }
             });
-
-            if (newSchedule.length > 0) {
-                newSchedule[0].startTime = sessionStartTime;
-            }
-
+            if (newSchedule.length > 0) { newSchedule[0].startTime = sessionStartTime; }
             state.studyData[key] = newSchedule;
             recalculateStartTimes(1);
-
             closeModal();
             render();
-            saveState();
+            enhancedSaveState();
         },
 
         confirmEditHours: (el) => {
@@ -611,22 +752,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const schedule = state.studyData[key] || [];
                 const item = schedule.find(s => s.id == itemId);
                 if (item) {
-                    if (item.type === 'break') {
-                        item.durationHours = value / 60; 
-                    } else {
-                        item.durationHours = value;
-                    }
+                    if (item.type === 'break') { item.durationHours = value / 60; } 
+                    else { item.durationHours = value; }
                     if (item.type === 'subject') distributeSubTaskHours(item);
                     const itemIndex = schedule.indexOf(item);
                     recalculateStartTimes(itemIndex + 1);
                 }
-                closeModal(); render(); saveState();
+                closeModal(); render(); enhancedSaveState();
             } else {
                 DOM.hoursInput.classList.add('border-red-500');
                 setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500);
             }
         },
-        toggleMainCompletion: (el) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (item) { item.completed = !item.completed; if(item.type === 'subject') item.subTasks.forEach(t => t.completed = item.completed); render(); saveState(); } },
+        toggleMainCompletion: (el) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (item) { item.completed = !item.completed; if(item.type === 'subject') item.subTasks.forEach(t => t.completed = item.completed); render(); enhancedSaveState(); } },
         toggleSubTaskPanel: (el) => { 
             const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); 
             if(subject) { 
@@ -634,36 +772,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); 
                 else state.ui.openSubTaskPanels.add(id); 
                 renderSubjects(); 
-                saveState();
+                enhancedSaveState();
             } 
         },
-        addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); saveState(); } },
-        toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); saveState(); } },
-        deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); saveState(); } },
-        cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); saveState(); } },
+        addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); enhancedSaveState(); } },
+        toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); enhancedSaveState(); } },
+        deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); enhancedSaveState(); } },
+        cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); enhancedSaveState(); } },
         duplicateSubject: (el) => {
             const { itemId } = el.dataset;
             const key = formatDateKey(new Date());
             const schedule = state.studyData[key] || [];
             const originalSubject = schedule.find(s => s.id == itemId);
-
             if (originalSubject) {
-                const newDuplicate = {
-                    id: Date.now() + Math.random(),
-                    type: 'subject',
-                    name: originalSubject.name,
-                    durationHours: originalSubject.durationHours,
-                    completed: false,
-                    subTasks: [],
-                    startTime: null
-                };
+                const newDuplicate = { id: Date.now() + Math.random(), type: 'subject', name: originalSubject.name, durationHours: originalSubject.durationHours, completed: false, subTasks: [], startTime: null };
                 schedule.push(newDuplicate);
                 recalculateStartTimes(schedule.length - 1);
                 render();
-                saveState();
+                enhancedSaveState();
             }
         },
-        confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); saveState(); },
+        confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); enhancedSaveState(); },
         resetApp: () => { if (confirm("Are you sure? This will delete all subjects and schedules.")) { localStorage.removeItem('studyPlannerState'); window.location.reload(); } },
         handleOptionSelection: (el) => {
             const { settingKey } = el.dataset; const value = el.dataset[Object.keys(el.dataset).find(k => k !== 'action' && k !== 'settingKey')]; const isNumeric = settingKey !== 'startTime';
@@ -679,83 +808,48 @@ document.addEventListener('DOMContentLoaded', () => {
             const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null }));
             if(newSchedule.length > 0) newSchedule[0].startTime = scheduleStartTime;
             state.studyData[formatDateKey(new Date())] = newSchedule; recalculateStartTimes(1);
-            closeModal(); render(); saveState();
+            closeModal(); render(); enhancedSaveState();
         },
         addBreak: () => {
             const key = formatDateKey(new Date());
             const schedule = state.studyData[key] || [];
-            if (schedule.length === 0) {
-                alert("Generate a schedule first!");
-                return;
-            }
+            if (schedule.length === 0) { alert("Generate a schedule first!"); return; }
             let insertionIndex = schedule.findIndex(item => !item.completed);
             if (insertionIndex === -1) insertionIndex = schedule.length;
-
             const newBreak = { id: Date.now() + Math.random(), type: 'break', text: 'Break', durationHours: 15 / 60, completed: false, startTime: null };
-
-            if (insertionIndex === 0 && schedule.length > 0) {
-                newBreak.startTime = schedule[0].startTime;
-            }
-
+            if (insertionIndex === 0 && schedule.length > 0) { newBreak.startTime = schedule[0].startTime; }
             schedule.splice(insertionIndex, 0, newBreak);
             recalculateStartTimes(insertionIndex + 1);
             render();
-            saveState();
+            enhancedSaveState();
         },
         deleteItem: (el) => {
             const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId);
-            if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); saveState(); }
+            if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); enhancedSaveState(); }
         },
         exportData: (el) => {
-            const dataToExport = {
-                masterSubjects: state.masterSubjects,
-                studyData: state.studyData,
-                settings: state.settings,
-            };
+            const dataToExport = { masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, };
             const jsonString = JSON.stringify(dataToExport);
             navigator.clipboard.writeText(jsonString).then(() => {
                 const originalText = el.textContent;
                 el.textContent = 'Copied!';
-                el.classList.add('btn-primary');
-                el.classList.remove('btn-secondary');
-                setTimeout(() => {
-                    el.textContent = originalText;
-                    el.classList.remove('btn-primary');
-                    el.classList.add('btn-secondary');
-                }, 2000);
-            }).catch(err => {
-                alert('Failed to copy data. Please try again.');
-                console.error('Export error:', err);
-            });
+                el.classList.add('btn-primary'); el.classList.remove('btn-secondary');
+                setTimeout(() => { el.textContent = originalText; el.classList.remove('btn-primary'); el.classList.add('btn-secondary'); }, 2000);
+            }).catch(err => { alert('Failed to copy data.'); console.error('Export error:', err); });
         },
         importData: () => {
             const jsonString = DOM.importDataTextarea.value.trim();
-            if (!jsonString) {
-                alert('Please paste your data into the text box.');
-                return;
-            }
-
+            if (!jsonString) { alert('Please paste your data into the text box.'); return; }
             try {
                 const importedData = JSON.parse(jsonString);
-                if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) {
-                    throw new Error("Data format is incorrect.");
-                }
-
+                if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) { throw new Error("Data format is incorrect."); }
                 if (confirm('Are you sure you want to import this data? Your current schedule and settings will be overwritten.')) {
-                    const newState = {
-                        masterSubjects: importedData.masterSubjects,
-                        studyData: importedData.studyData,
-                        settings: importedData.settings,
-                        ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } // Reset UI
-                    };
+                    const newState = { masterSubjects: importedData.masterSubjects, studyData: importedData.studyData, settings: importedData.settings, ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } };
                     localStorage.setItem('studyPlannerState', JSON.stringify(newState));
                     alert('Data imported successfully! The app will now reload.');
                     window.location.reload();
                 }
-            } catch (error) {
-                alert('Failed to import data. Please check the format and try again.');
-                console.error('Import error:', error);
-            }
+            } catch (error) { alert('Failed to import data. Please check the format and try again.'); console.error('Import error:', error); }
         },
     };
 
@@ -771,28 +865,19 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const dropTarget = e.target.closest('[data-item-id]');
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-
         if (dropTarget && state.ui.draggedItemId && dropTarget.dataset.itemId !== state.ui.draggedItemId) {
             const key = formatDateKey(new Date());
             const schedule = state.studyData[key];
-            
             const sessionAnchorTime = schedule.length > 0 ? new Date(schedule[0].startTime.getTime()) : null;
-
             const fromIndex = schedule.findIndex(s => s.id == state.ui.draggedItemId);
             const toIndex = schedule.findIndex(s => s.id == dropTarget.dataset.itemId);
-
             if (fromIndex !== -1 && toIndex !== -1) {
                 const [draggedItem] = schedule.splice(fromIndex, 1);
                 schedule.splice(toIndex, 0, draggedItem);
-                
-                if (schedule.length > 0 && sessionAnchorTime) {
-                    schedule[0].startTime = sessionAnchorTime;
-                }
-                
+                if (schedule.length > 0 && sessionAnchorTime) { schedule[0].startTime = sessionAnchorTime; }
                 recalculateStartTimes(1);
-
                 render();
-                saveState();
+                enhancedSaveState();
             }
         }
     });
