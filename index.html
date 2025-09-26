@@ -107,8 +107,8 @@
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-main shadow-xl p-4 z-50 border-r border-secondary">
         <h2 class="text-xl font-bold mb-6 text-main">Menu</h2>
         <nav><ul>
-            <li><button data-action="generateSyncCode" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Start Sync Session</button></li>
-            <li><button data-action="startScanToSync" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Scan to Sync</button></li>
+            <li><button data-action="generateSyncCode" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Show QR</button></li>
+            <li><button data-action="startScanToSync" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Scan QR</button></li>
             <li><hr class="border-secondary my-2"></li>
             <li><button data-action="openModal" data-modal="manage-subjects-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Manage Subjects</button></li>
             <li><button data-action="openModal" data-modal="theme-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Customize Theme</button></li>
@@ -127,12 +127,22 @@
                         <h1 id="today-date" class="text-xl font-bold text-main"></h1>
                         <p id="today-day" class="text-sm text-subtle font-medium"></p>
                     </div>
-                    <button data-action="openModal" data-modal="generate-schedule-modal" class="btn btn-primary text-sm sm:hidden">
+                    
+                    <div class="flex items-center border-l border-secondary pl-3 ml-1 space-x-2">
+                         <button data-action="startScanToSync" title="Scan QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors sm:hidden text-subtle">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                        <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
+                            <i class="fas fa-qrcode"></i>
+                        </button>
+                        <div id="p2p-status" class="hidden">
+                            <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
+                        </div>
+                    </div>
+
+                    <button data-action="openModal" data-modal="generate-schedule-modal" class="btn btn-primary text-sm sm:hidden ml-auto">
                         Generate
                     </button>
-                    <div id="p2p-status" class="flex items-center gap-2 pl-2 hidden">
-                        <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
-                    </div>
                 </div>
                 
                 <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
@@ -255,6 +265,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     const state = {
+        lastUpdated: null, // NEW: Timestamp for latest change
         masterSubjects: [],
         studyData: {},
         settings: { theme: 'dark', accent: 'green', sessionEndTime: null, defaultDuration: 1 },
@@ -289,10 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
         peer.on('connection', (conn) => {
             console.log('Received incoming connection');
             if (state.p2p.connection) {
-                state.p2p.connection.close(); // Close any existing connection
+                state.p2p.connection.close();
             }
             state.p2p.connection = conn;
-            setupConnectionListeners(conn, true); // This device is the host
+            setupConnectionListeners(conn);
         });
 
         peer.on('error', (err) => {
@@ -301,36 +312,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const setupConnectionListeners = (conn, isHost = false) => {
+    const setupConnectionListeners = (conn) => {
         conn.on('open', () => {
             console.log('Connection established with ' + conn.peer);
             state.p2p.isConnected = true;
             updateP2PStatus('connected');
             closeModal(); 
-            // **FIX:** Only the host sends its state on initial connection to avoid a race condition.
-            if (isHost) {
-                broadcastState(); 
-            }
+            // When connection opens, both sides broadcast their state.
+            // The timestamp check will ensure only the newest state is accepted.
+            broadcastState();
         });
 
         conn.on('data', (data) => {
             if (data.type === 'state-update') {
-                state.ui.isReceivingP2PUpdate = true;
-                
-                state.masterSubjects = data.payload.masterSubjects;
-                state.settings = data.payload.settings;
-                state.studyData = data.payload.studyData;
-                
-                Object.values(state.studyData).forEach(day => {
-                    day.forEach(item => {
-                        if (item.startTime) item.startTime = new Date(item.startTime);
+                // **LATEST STATE WINS LOGIC**
+                // Only accept the update if the incoming state is newer than the current state.
+                if (data.payload.lastUpdated > state.lastUpdated || state.lastUpdated === null) {
+                    console.log(`Accepting newer state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`);
+                    state.ui.isReceivingP2PUpdate = true;
+                    
+                    // Update all parts of the state from the payload
+                    state.lastUpdated = data.payload.lastUpdated;
+                    state.masterSubjects = data.payload.masterSubjects;
+                    state.settings = data.payload.settings;
+                    state.studyData = data.payload.studyData;
+                    
+                    Object.values(state.studyData).forEach(day => {
+                        day.forEach(item => {
+                            if (item.startTime) item.startTime = new Date(item.startTime);
+                        });
                     });
-                });
 
-                saveState(); // Save the newly received state locally
-                render();    // Re-render the UI with the new state
-                
-                setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50);
+                    saveState();
+                    render();    
+                    
+                    setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50);
+                } else {
+                     console.log(`Ignoring stale state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`);
+                }
             }
         });
 
@@ -347,6 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const payload = {
+            lastUpdated: state.lastUpdated,
             masterSubjects: state.masterSubjects,
             studyData: state.studyData,
             settings: state.settings,
@@ -354,8 +374,9 @@ document.addEventListener('DOMContentLoaded', () => {
         state.p2p.connection.send({ type: 'state-update', payload });
     };
 
-    // This is now the primary way to save data, ensuring any change is also broadcast.
     const enhancedSaveState = () => {
+        // NEW: Every change updates the timestamp before saving and broadcasting.
+        state.lastUpdated = Date.now();
         saveState();
         broadcastState();
     }
@@ -363,9 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END P2P SYNC LOGIC ---
     
     const saveState = () => {
-        // **BUG FIX:** Create a copy of the state to save, and explicitly delete the p2p object
-        // from the copy. This prevents the "circular structure" error when trying to JSON.stringify
-        // the live connection object.
         const stateToSave = { ...state };
         delete stateToSave.p2p;
         localStorage.setItem('studyPlannerState', JSON.stringify(stateToSave));
@@ -646,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.p2p.connection.close();
                 }
                 state.p2p.connection = conn;
-                setupConnectionListeners(conn, false); // This device is the client
+                setupConnectionListeners(conn);
                 updateP2PStatus('connecting');
             };
 
