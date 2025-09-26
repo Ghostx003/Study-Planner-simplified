@@ -50,7 +50,7 @@
         .bg-tertiary { background-color: var(--bg-tertiary); }
         .border-main { border-color: var(--border-primary); }
         .border-secondary { border-color: var(--border-secondary); }
-        .btn { padding: 0.5rem 1.2rem; border-radius: 0.5rem; font-weight: 600; transition: background-color 0.2s, box-shadow 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .btn { padding: 0.5rem 1.2rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .btn-primary { background-color: var(--accent-primary); color: var(--text-on-accent); }
         .btn-primary:hover { background-color: var(--accent-hover); }
         .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
@@ -101,7 +101,8 @@
         <nav><ul>
             <li><button data-action="openModal" data-modal="manage-subjects-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Manage Subjects</button></li>
             <li><button data-action="openModal" data-modal="theme-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Customize Theme</button></li>
-             <li><button data-action="resetApp" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Reset App</button></li>
+            <li><button data-action="openModal" data-modal="export-import-modal" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Export / Import Data</button></li>
+            <li><button data-action="resetApp" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Reset App</button></li>
         </ul></nav>
     </aside>
     <main class="flex items-start justify-center min-h-screen p-2 sm:p-4">
@@ -181,6 +182,29 @@
         </div>
     </div>
     
+    <div id="export-import-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-lg">
+            <h4 class="text-xl font-bold mb-4 text-main">Export / Import Data</h4>
+            <div class="space-y-6">
+                <div>
+                    <h5 class="font-semibold text-main mb-2">Export</h5>
+                    <p class="text-sm text-subtle mb-3">Click the button to copy your current schedule and settings data to the clipboard.</p>
+                    <button data-action="exportData" class="btn btn-secondary w-full">Copy Data to Clipboard</button>
+                </div>
+                <hr class="border-secondary">
+                <div>
+                    <h5 class="font-semibold text-main mb-2">Import</h5>
+                    <p class="text-sm text-subtle mb-3">Paste the exported data into the box below and click "Import" to load it. This will overwrite your current data.</p>
+                    <textarea id="import-data-textarea" rows="5" class="w-full p-2 input-main" placeholder="Paste your exported data here..."></textarea>
+                    <button data-action="importData" class="btn btn-primary w-full mt-3">Import Data</button>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button data-action="closeModal" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="session-end-time-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 class="text-xl font-bold mb-4 text-main">Session End Time</h4><input type="time" id="session-end-time-input" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEndTime" class="btn btn-primary">Set</button></div></div></div>
     
     <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs">
@@ -210,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editHoursTitle: document.getElementById('edit-hours-title'),
         editHoursSubjectName: document.getElementById('edit-hours-subject-name'),
         startTimeSelection: document.getElementById('start-time-selection'), defaultDurationSelection: document.getElementById('default-duration-selection'), subjectCountSelection: document.getElementById('subject-count-selection'), confirmGenerateBtn: document.getElementById('confirm-generate-btn'),
+        importDataTextarea: document.getElementById('import-data-textarea'),
     };
     
     const saveState = () => localStorage.setItem('studyPlannerState', JSON.stringify(state));
@@ -381,12 +406,12 @@ document.addEventListener('DOMContentLoaded', () => {
                  <div class="flex items-center justify-between mt-4 gap-2">
                      <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary flex-grow">
                      <div class="flex-shrink-0 flex items-center gap-2">
-                        <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs">
+                         <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs">
                              <i class="fas fa-copy mr-1"></i> Duplicate
-                        </button>
-                        <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);">
-                            <i class="fas fa-trash-alt mr-1"></i> Delete
-                        </button>
+                         </button>
+                         <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);">
+                             <i class="fas fa-trash-alt mr-1"></i> Delete
+                         </button>
                      </div>
                  </div>`; 
         return html; 
@@ -680,6 +705,57 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteItem: (el) => {
             const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId);
             if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); saveState(); }
+        },
+        exportData: (el) => {
+            const dataToExport = {
+                masterSubjects: state.masterSubjects,
+                studyData: state.studyData,
+                settings: state.settings,
+            };
+            const jsonString = JSON.stringify(dataToExport);
+            navigator.clipboard.writeText(jsonString).then(() => {
+                const originalText = el.textContent;
+                el.textContent = 'Copied!';
+                el.classList.add('btn-primary');
+                el.classList.remove('btn-secondary');
+                setTimeout(() => {
+                    el.textContent = originalText;
+                    el.classList.remove('btn-primary');
+                    el.classList.add('btn-secondary');
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy data. Please try again.');
+                console.error('Export error:', err);
+            });
+        },
+        importData: () => {
+            const jsonString = DOM.importDataTextarea.value.trim();
+            if (!jsonString) {
+                alert('Please paste your data into the text box.');
+                return;
+            }
+
+            try {
+                const importedData = JSON.parse(jsonString);
+                if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) {
+                    throw new Error("Data format is incorrect.");
+                }
+
+                if (confirm('Are you sure you want to import this data? Your current schedule and settings will be overwritten.')) {
+                    const newState = {
+                        masterSubjects: importedData.masterSubjects,
+                        studyData: importedData.studyData,
+                        settings: importedData.settings,
+                        ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } // Reset UI
+                    };
+                    localStorage.setItem('studyPlannerState', JSON.stringify(newState));
+                    alert('Data imported successfully! The app will now reload.');
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('Failed to import data. Please check the format and try again.');
+                console.error('Import error:', error);
+            }
         },
     };
 
