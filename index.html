@@ -13,6 +13,7 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* THEME & COLOR SYSTEM */
         :root {
@@ -65,10 +66,7 @@
         #sidebar-overlay { transition: opacity 0.3s ease-in-out; background-color: rgba(0,0,0,0.5); }
         .custom-checkbox { border: 2px solid var(--border-primary); transition: all 0.2s; }
         .custom-checkbox.completed { background-color: var(--accent-primary); border-color: var(--accent-primary); }
-        .custom-checkbox.completed::after {
-            content: '✓'; color: white; display: flex; font-weight: bold; align-items: center;
-            justify-content: center; font-size: 1em; line-height: 1; height: 100%;
-        }
+        .custom-checkbox.completed::after { content: '✓'; color: white; display: flex; font-weight: bold; align-items: center; justify-content: center; font-size: 1em; line-height: 1; height: 100%; }
         .subject-label.completed, .subtask-label.completed, .break-item.completed span { text-decoration: line-through; color: var(--text-secondary); }
         .drag-handle { cursor: grab; }
         .dragging { opacity: 0.5; background-color: var(--bg-tertiary); }
@@ -81,24 +79,23 @@
         .status-revision { background-color: rgba(168, 85, 247, 0.1); color: #a855f7; }
         .status-practice { background-color: rgba(249, 115, 22, 0.1); color: #f97316; }
         .status-test { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
-        
         .option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.75rem; }
-        .option-item {
-            padding: 0.75rem; border: 2px solid var(--border-primary); border-radius: 0.5rem;
-            text-align: center; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
-        }
-        .option-item.selected {
-            background-color: var(--accent-primary); color: var(--text-on-accent);
-            border-color: var(--accent-primary); transform: scale(1.05);
-        }
-        .break-item {
-            background-color: var(--break-bg);
-        }
-        /* P2P Status Indicator */
+        .option-item { padding: 0.75rem; border: 2px solid var(--border-primary); border-radius: 0.5rem; text-align: center; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .option-item.selected { background-color: var(--accent-primary); color: var(--text-on-accent); border-color: var(--accent-primary); transform: scale(1.05); }
+        .break-item { background-color: var(--break-bg); }
         #p2p-status-indicator { width: 10px; height: 10px; border-radius: 50%; transition: background-color 0.3s; }
         #p2p-status-indicator.disconnected { background-color: #ef4444; }
         #p2p-status-indicator.connecting { background-color: #f97316; }
         #p2p-status-indicator.connected { background-color: #22c55e; }
+        .swap-active { background-color: var(--accent-translucent) !important; border: 2px solid var(--accent-primary); border-radius: 0.375rem; transform: scale(1.05); }
+        
+        #chart-center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -107,6 +104,9 @@
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-main shadow-xl p-4 z-50 border-r border-secondary">
         <h2 class="text-xl font-bold mb-6 text-main">Menu</h2>
         <nav><ul>
+            <li><button data-action="showScheduleView" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Schedule</button></li>
+            <li><button data-action="showSummaryView" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Summary</button></li>
+            <li><hr class="border-secondary my-2"></li>
             <li><button data-action="generateSyncCode" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Show QR</button></li>
             <li><button data-action="startScanToSync" class="w-full text-left py-2 px-3 rounded-md hover:bg-tertiary font-semibold transition-colors text-main">Scan QR</button></li>
             <li><hr class="border-secondary my-2"></li>
@@ -117,7 +117,7 @@
         </ul></nav>
     </aside>
     <main class="flex items-start justify-center min-h-screen p-2 sm:p-4">
-        <div class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-4 sm:p-6 border border-secondary">
+        <div id="schedule-view" class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-4 sm:p-6 border border-secondary">
             <header class="flex items-center justify-between mb-6 flex-wrap gap-y-4">
                 <div class="flex items-center space-x-3">
                     <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
@@ -130,14 +130,14 @@
                     
                     <div class="flex items-center border-l border-secondary pl-3 ml-1 space-x-2">
                          <button data-action="startScanToSync" title="Scan QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors sm:hidden text-subtle">
-                            <i class="fas fa-camera"></i>
-                        </button>
-                        <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
-                            <i class="fas fa-qrcode"></i>
-                        </button>
-                        <div id="p2p-status" class="hidden">
-                            <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
-                        </div>
+                             <i class="fas fa-camera"></i>
+                         </button>
+                         <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
+                             <i class="fas fa-qrcode"></i>
+                         </button>
+                         <div id="p2p-status" class="hidden">
+                             <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
+                         </div>
                     </div>
 
                     <button data-action="openModal" data-modal="generate-schedule-modal" class="btn btn-primary text-sm sm:hidden ml-auto">
@@ -174,105 +174,69 @@
                 </div>
             </section>
         </div>
+
+        <div id="summary-view" class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-4 sm:p-6 border border-secondary hidden">
+            <header class="flex items-center justify-between mb-6 flex-wrap gap-y-3">
+                 <div class="flex items-center gap-3">
+                    <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
+                        <svg class="w-6 h-6 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                     <h1 class="text-2xl font-bold text-main">Learning Time</h1>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <select id="summary-filter" class="w-full p-2 input-main">
+                        <option value="overall">Overall Completed</option>
+                        <option value="Lecture">Lecture</option>
+                        <option value="Revision">Revision</option>
+                        <option value="Practice">Practice</option>
+                        <option value="Test">Test</option>
+                    </select>
+                </div>
+            </header>
+            <div class="bg-tertiary p-4 sm:p-6 rounded-xl">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div id="summary-chart-container" class="relative mx-auto w-full max-w-xs h-auto aspect-square">
+                        <canvas id="summary-chart"></canvas>
+                        <div id="chart-center-text" class="text-center"></div>
+                    </div>
+                    <div id="custom-legend" class="space-y-3"></div>
+                </div>
+            </div>
+             <button data-action="exportSummary" class="btn btn-secondary w-full !mt-6">Export Summary to Clipboard</button>
+        </div>
     </main>
-
-    <div id="qr-code-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs text-center">
-            <h4 class="text-xl font-bold mb-4 text-main">Scan to Sync</h4>
-            <p class="text-sm text-subtle mb-4">Scan this code with your other device to establish a real-time sync connection.</p>
-            <div id="qrcode-container" class="flex justify-center bg-white p-4 rounded-lg"></div>
-            <div class="flex justify-end mt-6">
-                <button data-action="closeModal" class="btn btn-secondary">Close</button>
-            </div>
-        </div>
-    </div>
-    <div id="qr-scanner-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md">
-            <h4 class="text-xl font-bold mb-4 text-main">Scan QR Code</h4>
-            <div id="qr-reader" class="w-full border border-main rounded-lg overflow-hidden"></div>
-            <div class="flex justify-end mt-6">
-                <button data-action="stopScanToSync" class="btn btn-secondary">Cancel</button>
-            </div>
-        </div>
-    </div>
-
+    
+    <div id="qr-code-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs text-center"><h4 class="text-xl font-bold mb-4 text-main">Scan to Sync</h4><p class="text-sm text-subtle mb-4">Scan this code with your other device to establish a real-time sync connection.</p><div id="qrcode-container" class="flex justify-center bg-white p-4 rounded-lg"></div><div class="flex justify-end mt-6"><button data-action="closeModal" class="btn btn-secondary">Close</button></div></div></div>
+    <div id="qr-scanner-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md"><h4 class="text-xl font-bold mb-4 text-main">Scan QR Code</h4><div id="qr-reader" class="w-full border border-main rounded-lg overflow-hidden"></div><div class="flex justify-end mt-6"><button data-action="stopScanToSync" class="btn btn-secondary">Cancel</button></div></div></div>
     <div id="theme-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-sm"><h4 class="text-xl font-bold mb-5 text-main">Customize Theme</h4><div id="theme-options" class="space-y-6"></div><div class="flex justify-end mt-6"><button data-action="closeModal" class="btn btn-secondary">Close</button></div></div></div>
     <div id="manage-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md"><h4 class="text-xl font-bold mb-2 text-main">Manage Subjects</h4><p class="text-sm text-subtle mb-4">Add or remove subjects from your master list.</p><div class="flex gap-2 mb-4"><input type="text" id="new-subject-input" placeholder="Add new subject..." class="w-full p-2 input-main"><button data-action="addMasterSubject" class="btn btn-primary">Add</button></div><div id="master-subjects-list" class="space-y-2 mb-6 max-h-64 overflow-y-auto border-y border-main py-3"></div><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Done</button></div></div></div>
-    <div id="edit-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md"><h4 class="text-xl font-bold mb-5 text-main">Select Subjects for Today</h4><div id="subjects-checklist" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6 max-h-64 overflow-y-auto"></div><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEditSubjects" class="btn btn-primary">Save</button></div></div></div>
-    
-    <div id="generate-schedule-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-main rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
-            <div class="p-6 pb-4 flex-shrink-0">
-                <h4 class="text-xl font-bold text-main">Generate a New Schedule</h4>
-            </div>
-            <div class="px-6 space-y-6 overflow-y-auto flex-grow">
-                <div>
-                    <h5 class="text-sm font-bold text-subtle mb-2">1. When do you want to start?</h5>
-                    <div id="start-time-selection" class="option-grid"></div>
-                </div>
-                <div>
-                    <h5 class="text-sm font-bold text-subtle mb-2">2. What's the default duration? (Hours)</h5>
-                    <div id="default-duration-selection" class="option-grid"></div>
-                </div>
-                <div>
-                    <h5 class="text-sm font-bold text-subtle mb-2">3. How many subjects?</h5>
-                    <div id="subject-count-selection" class="option-grid"></div>
-                </div>
-            </div>
-            <div class="flex justify-end space-x-3 p-6 pt-4 mt-auto flex-shrink-0 border-t border-secondary">
-                <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
-                <button data-action="confirmGenerateSchedule" id="confirm-generate-btn" class="btn btn-primary" disabled>Create Schedule</button>
-            </div>
-        </div>
-    </div>
-    
-    <div id="export-import-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4">
-        <div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-lg">
-            <h4 class="text-xl font-bold mb-4 text-main">Export / Import Data</h4>
-            <div class="space-y-6">
-                <div>
-                    <h5 class="font-semibold text-main mb-2">Export</h5>
-                    <p class="text-sm text-subtle mb-3">Click the button to copy your current schedule and settings data to the clipboard.</p>
-                    <button data-action="exportData" class="btn btn-secondary w-full">Copy Data to Clipboard</button>
-                </div>
-                <hr class="border-secondary">
-                <div>
-                    <h5 class="font-semibold text-main mb-2">Import</h5>
-                    <p class="text-sm text-subtle mb-3">Paste the exported data into the box below and click "Import" to load it. This will overwrite your current data.</p>
-                    <textarea id="import-data-textarea" rows="5" class="w-full p-2 input-main" placeholder="Paste your exported data here..."></textarea>
-                    <button data-action="importData" class="btn btn-primary w-full mt-3">Import Data</button>
-                </div>
-            </div>
-            <div class="flex justify-end mt-6">
-                <button data-action="closeModal" class="btn btn-secondary">Close</button>
-            </div>
-        </div>
-    </div>
-    
+    <div id="edit-subjects-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-md"><h4 class="text-xl font-bold mb-5 text-main">Select Subjects for Today</h4><p class="text-xs text-subtle mb-4">Tip: Double-click an existing subject to activate Swap Mode.</p><div id="subjects-checklist" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6 max-h-64 overflow-y-auto"></div><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEditSubjects" class="btn btn-primary">Save</button></div></div></div>
+    <div id="generate-schedule-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]"><div class="p-6 pb-4 flex-shrink-0"><h4 class="text-xl font-bold text-main">Generate a New Schedule</h4></div><div class="px-6 space-y-6 overflow-y-auto flex-grow"><div><h5 class="text-sm font-bold text-subtle mb-2">1. When do you want to start?</h5><div id="start-time-selection" class="option-grid"></div></div><div><h5 class="text-sm font-bold text-subtle mb-2">2. What's the default duration? (Hours)</h5><div id="default-duration-selection" class="option-grid"></div></div><div><h5 class="text-sm font-bold text-subtle mb-2">3. How many subjects?</h5><div id="subject-count-selection" class="option-grid"></div></div></div><div class="flex justify-end space-x-3 p-6 pt-4 mt-auto flex-shrink-0 border-t border-secondary"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmGenerateSchedule" id="confirm-generate-btn" class="btn btn-primary" disabled>Create Schedule</button></div></div></div>
+    <div id="export-import-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-lg"><h4 class="text-xl font-bold mb-4 text-main">Export / Import Data</h4><div class="space-y-6"><div><h5 class="font-semibold text-main mb-2">Export</h5><p class="text-sm text-subtle mb-3">Click the button to copy your current schedule and settings data to the clipboard.</p><button data-action="exportData" class="btn btn-secondary w-full">Copy Data to Clipboard</button></div><hr class="border-secondary"><div><h5 class="font-semibold text-main mb-2">Import</h5><p class="text-sm text-subtle mb-3">Paste the exported data into the box below and click "Import" to load it. This will overwrite your current data.</p><textarea id="import-data-textarea" rows="5" class="w-full p-2 input-main" placeholder="Paste your exported data here..."></textarea><button data-action="importData" class="btn btn-primary w-full mt-3">Import Data</button></div></div><div class="flex justify-end mt-6"><button data-action="closeModal" class="btn btn-secondary">Close</button></div></div></div>
     <div id="session-end-time-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 class="text-xl font-bold mb-4 text-main">Session End Time</h4><input type="time" id="session-end-time-input" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEndTime" class="btn btn-primary">Set</button></div></div></div>
-    
-    <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs">
-        <h4 id="edit-hours-title" class="text-xl font-bold mb-2 text-main">Set Duration</h4>
-        <p id="edit-hours-subject-name" class="text-md mb-4 text-subtle"></p>
-        <input type="number" id="hours-input" min="0.25" step="0.25" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main">
-        <div class="flex justify-end space-x-3">
-            <button data-action="closeModal" class="btn btn-secondary">Cancel</button>
-            <button data-action="confirmEditHours" class="btn btn-primary">Save</button>
-        </div>
-    </div></div>
+    <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 id="edit-hours-title" class="text-xl font-bold mb-2 text-main">Set Duration</h4><p id="edit-hours-subject-name" class="text-md mb-4 text-subtle"></p><input type="number" id="hours-input" min="0.25" step="0.25" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEditHours" class="btn btn-primary">Save</button></div></div></div>
     
 <script>
 document.addEventListener('DOMContentLoaded', () => {
 
     const state = {
-        lastUpdated: null, // NEW: Timestamp for latest change
+        lastUpdated: null,
         masterSubjects: [],
         studyData: {},
         settings: { theme: 'dark', accent: 'green', sessionEndTime: null, defaultDuration: 1 },
-        ui: { currentModal: null, openSubTaskPanels: new Set(), draggedItemId: null, isReceivingP2PUpdate: false },
+        ui: { 
+            currentModal: null, 
+            openSubTaskPanels: new Set(), 
+            draggedItemId: null, 
+            isReceivingP2PUpdate: false,
+            swapState: { active: false, subjectToSwap: null },
+            currentView: 'schedule' 
+        },
         scheduleParams: { startTime: null, subjectCount: null, defaultDuration: null },
         p2p: { peer: null, connection: null, isConnected: false, scanner: null }
     };
+
+    let summaryChartInstance = null;
 
     const ACTIVITY_TYPES = ['None', 'Lecture', 'Revision', 'Practice', 'Test'];
     const DOM = {
@@ -285,402 +249,205 @@ document.addEventListener('DOMContentLoaded', () => {
         p2pStatusIndicator: document.getElementById('p2p-status-indicator'),
         qrCodeContainer: document.getElementById('qrcode-container'),
         qrReader: document.getElementById('qr-reader'),
+        scheduleView: document.getElementById('schedule-view'),
+        summaryView: document.getElementById('summary-view'),
+        summaryFilter: document.getElementById('summary-filter'),
+        summaryChartContainer: document.getElementById('summary-chart-container'),
+        chartCenterText: document.getElementById('chart-center-text'),
+        customLegend: document.getElementById('custom-legend'),
     };
     
-    // --- P2P SYNC LOGIC ---
-
-    const updateP2PStatus = (status) => {
-        DOM.p2pStatus.classList.remove('hidden');
-        DOM.p2pStatusIndicator.className = status;
-    };
-
-    const setupPeerListeners = (peer) => {
-        peer.on('open', (id) => console.log('My peer ID is: ' + id));
-
-        peer.on('connection', (conn) => {
-            console.log('Received incoming connection');
-            if (state.p2p.connection) {
-                state.p2p.connection.close();
-            }
-            state.p2p.connection = conn;
-            setupConnectionListeners(conn);
-        });
-
-        peer.on('error', (err) => {
-            console.error('PeerJS error:', err);
-            updateP2PStatus('disconnected');
-        });
-    };
-
-    const setupConnectionListeners = (conn) => {
-        conn.on('open', () => {
-            console.log('Connection established with ' + conn.peer);
-            state.p2p.isConnected = true;
-            updateP2PStatus('connected');
-            closeModal(); 
-            // When connection opens, both sides broadcast their state.
-            // The timestamp check will ensure only the newest state is accepted.
-            broadcastState();
-        });
-
-        conn.on('data', (data) => {
-            if (data.type === 'state-update') {
-                // **LATEST STATE WINS LOGIC**
-                // Only accept the update if the incoming state is newer than the current state.
-                if (data.payload.lastUpdated > state.lastUpdated || state.lastUpdated === null) {
-                    console.log(`Accepting newer state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`);
-                    state.ui.isReceivingP2PUpdate = true;
-                    
-                    // Update all parts of the state from the payload
-                    state.lastUpdated = data.payload.lastUpdated;
-                    state.masterSubjects = data.payload.masterSubjects;
-                    state.settings = data.payload.settings;
-                    state.studyData = data.payload.studyData;
-                    
-                    Object.values(state.studyData).forEach(day => {
-                        day.forEach(item => {
-                            if (item.startTime) item.startTime = new Date(item.startTime);
-                        });
-                    });
-
-                    saveState();
-                    render();    
-                    
-                    setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50);
-                } else {
-                     console.log(`Ignoring stale state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`);
-                }
-            }
-        });
-
-        conn.on('close', () => {
-            console.log('Connection closed.');
-            state.p2p.isConnected = false;
-            state.p2p.connection = null;
-            updateP2PStatus('disconnected');
-        });
-    };
-
-    const broadcastState = () => {
-        if (!state.p2p.connection || !state.p2p.isConnected || state.ui.isReceivingP2PUpdate) {
-            return;
-        }
-        const payload = {
-            lastUpdated: state.lastUpdated,
-            masterSubjects: state.masterSubjects,
-            studyData: state.studyData,
-            settings: state.settings,
-        };
-        state.p2p.connection.send({ type: 'state-update', payload });
-    };
-
-    const enhancedSaveState = () => {
-        // NEW: Every change updates the timestamp before saving and broadcasting.
-        state.lastUpdated = Date.now();
-        saveState();
-        broadcastState();
-    }
-    
-    // --- END P2P SYNC LOGIC ---
-    
-    const saveState = () => {
-        const stateToSave = { ...state };
-        delete stateToSave.p2p;
-        localStorage.setItem('studyPlannerState', JSON.stringify(stateToSave));
-    };
-
-
-    const loadState = () => {
-        const savedState = localStorage.getItem('studyPlannerState');
-        if (savedState) {
-            const parsedState = JSON.parse(savedState);
-            Object.keys(parsedState).forEach(key => {
-                if (key === 'p2p') return; 
-                if (typeof parsedState[key] === 'object' && parsedState[key] !== null && !Array.isArray(parsedState[key])) {
-                    state[key] = { ...state[key], ...parsedState[key] };
-                } else {
-                    state[key] = parsedState[key];
-                }
-            });
-            
-            state.ui.openSubTaskPanels = new Set(Array.from(state.ui.openSubTaskPanels || []));
-            
-            Object.values(state.studyData).forEach(day => {
-                day.forEach(item => {
-                    if (!item.id) item.id = Date.now() + Math.random();
-                    if (!item.type) item.type = 'subject';
-                    if (item.type === 'subject') {
-                         if (item.subTasks && item.subTasks.length > 0) {
-                             item.subTasks.forEach(task => { if (task.status === undefined) task.status = 'None'; });
-                         }
-                    } else if (item.type === 'break' && typeof item.text === 'undefined') {
-                        item.text = 'Break';
-                    }
-                    if (item.startTime) item.startTime = new Date(item.startTime);
-                });
-            });
-        } else {
-            state.masterSubjects = ['DM', 'MATHS', 'APTITUDE', 'DL', 'TOC', 'COA', 'OS', 'DBMS', 'CN', 'CD', 'C', 'DAA', 'DSA'];
-        }
-    };
-    
+    // --- Core Utilities & State Management ---
+    const updateP2PStatus = (status) => { DOM.p2pStatus.classList.remove('hidden'); DOM.p2pStatusIndicator.className = status; };
+    const setupPeerListeners = (peer) => { peer.on('open', (id) => console.log('My peer ID is: ' + id)); peer.on('connection', (conn) => { console.log('Received incoming connection'); if (state.p2p.connection) { state.p2p.connection.close(); } state.p2p.connection = conn; setupConnectionListeners(conn); }); peer.on('error', (err) => { console.error('PeerJS error:', err); updateP2PStatus('disconnected'); }); };
+    const setupConnectionListeners = (conn) => { conn.on('open', () => { console.log('Connection established with ' + conn.peer); state.p2p.isConnected = true; updateP2PStatus('connected'); closeModal(); broadcastState(); }); conn.on('data', (data) => { if (data.type === 'state-update') { if (data.payload.lastUpdated > state.lastUpdated || state.lastUpdated === null) { console.log(`Accepting newer state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); state.ui.isReceivingP2PUpdate = true; state.lastUpdated = data.payload.lastUpdated; state.masterSubjects = data.payload.masterSubjects; state.settings = data.payload.settings; state.studyData = data.payload.studyData; Object.values(state.studyData).forEach(day => { day.forEach(item => { if (item.startTime) item.startTime = new Date(item.startTime); }); }); saveState(); render(); setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50); } else { console.log(`Ignoring stale state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); } } }); conn.on('close', () => { console.log('Connection closed.'); state.p2p.isConnected = false; state.p2p.connection = null; updateP2PStatus('disconnected'); }); };
+    const broadcastState = () => { if (!state.p2p.connection || !state.p2p.isConnected || state.ui.isReceivingP2PUpdate) { return; } const payload = { lastUpdated: state.lastUpdated, masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, }; state.p2p.connection.send({ type: 'state-update', payload }); };
+    const enhancedSaveState = () => { state.lastUpdated = Date.now(); saveState(); broadcastState(); }
+    const saveState = () => { const stateToSave = { ...state }; delete stateToSave.p2p; localStorage.setItem('studyPlannerState', JSON.stringify(stateToSave)); };
+    const loadState = () => { const savedState = localStorage.getItem('studyPlannerState'); if (savedState) { const parsedState = JSON.parse(savedState); Object.keys(parsedState).forEach(key => { if (key === 'p2p') return; if (typeof parsedState[key] === 'object' && parsedState[key] !== null && !Array.isArray(parsedState[key])) { state[key] = { ...state[key], ...parsedState[key] }; } else { state[key] = parsedState[key]; } }); state.ui.openSubTaskPanels = new Set(Array.from(state.ui.openSubTaskPanels || [])); Object.values(state.studyData).forEach(day => { day.forEach(item => { if (!item.id) item.id = Date.now() + Math.random(); if (!item.type) item.type = 'subject'; if (item.type === 'subject') { if (item.subTasks && item.subTasks.length > 0) { item.subTasks.forEach(task => { if (task.status === undefined) task.status = 'None'; }); } } else if (item.type === 'break' && typeof item.text === 'undefined') { item.text = 'Break'; } if (item.startTime) item.startTime = new Date(item.startTime); if (item.finishedAt) item.finishedAt = new Date(item.finishedAt); }); }); } else { state.masterSubjects = ['DM', 'MATHS', 'APTITUDE', 'DL', 'TOC', 'COA', 'OS', 'DBMS', 'CN', 'CD', 'C', 'DAA', 'DSA']; } };
     const formatDateKey = (date) => date.toISOString().split('T')[0];
     const distributeSubTaskHours = (subject) => { if (!subject || !subject.subTasks || !subject.subTasks.length === 0) return; const h = subject.durationHours / subject.subTasks.length; subject.subTasks.forEach(t => { t.hours = h; }); };
-    
     const calculateEndTime = (startTime, durationHours) => new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
-    const formatTime = (date) => {
-        if (!date || !(date instanceof Date)) return 'N/A';
-        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-    const formatTimeTo24hr = (date) => {
-        if (!date || !(date instanceof Date)) return '';
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-    };
-
-    const recalculateStartTimes = (startIndex = 0) => {
-        const key = formatDateKey(new Date());
-        const schedule = state.studyData[key] || [];
-        if (schedule.length === 0) return;
-
-        for (let i = startIndex; i < schedule.length; i++) {
-            if (i > 0) {
-                const prevItem = schedule[i - 1];
-                if(prevItem.startTime) {
-                    schedule[i].startTime = calculateEndTime(prevItem.startTime, prevItem.durationHours);
-                }
-            }
+    const formatTime = (date) => { if (!date || !(date instanceof Date)) return 'N/A'; return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    const formatTimeTo24hr = (date) => { if (!date || !(date instanceof Date)) return ''; const hours = String(date.getHours()).padStart(2, '0'); const minutes = String(date.getMinutes()).padStart(2, '0'); return `${hours}:${minutes}`; };
+    const recalculateStartTimes = (startIndex = 0) => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; if (schedule.length === 0) return; for (let i = startIndex; i < schedule.length; i++) { if (i > 0) { const prevItem = schedule[i - 1]; if(prevItem.startTime) { schedule[i].startTime = calculateEndTime(prevItem.startTime, prevItem.durationHours); } } } };
+    const formatHoursAndMinutes = (totalHours) => { if (totalHours === 0 || !totalHours) return '0 min'; const hours = Math.floor(totalHours); const minutes = Math.round((totalHours - hours) * 60); const hourString = hours > 0 ? `${hours} hr` : ''; const minuteString = minutes > 0 ? `${minutes} min` : ''; return [hourString, minuteString].filter(Boolean).join(' '); };
+    const formatHoursAndMinutesCompact = (totalHours) => { if (totalHours === 0 || !totalHours) return '0m'; const hours = Math.floor(totalHours); const minutes = Math.round((totalHours - hours) * 60); if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`; if (hours > 0) return `${hours}h`; return `${minutes}m`; };
+    const createSmallProgressCircle = (progress) => { const size = 36; const sw = 4; const r = (size / 2) - (sw / 2); const circ = 2 * Math.PI * r; const o = circ - (progress / 100) * circ; return `<svg class="w-9 h-9 flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle></svg>`; };
+    const createProgressCircle = (progress, textContent = '') => { const size = 56; const sw = 6; const r = (size / 2) - (sw / 2); const circ = 2 * Math.PI * r; const o = circ - (progress / 100) * circ; const text = textContent ? `<text x="50%" y="50%" dy=".3em" text-anchor="middle" class="text-[11px] font-bold" fill="var(--text-primary)">${textContent}</text>` : ''; return `<svg class="w-full h-full flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle>${text}</svg>`; };
+    
+    // --- Render Functions ---
+    const render = () => { 
+        document.documentElement.setAttribute('data-theme', state.settings.theme); 
+        document.documentElement.setAttribute('data-accent', state.settings.accent); 
+        if (state.ui.currentView === 'summary') {
+            DOM.scheduleView.classList.add('hidden');
+            DOM.summaryView.classList.remove('hidden');
+            setupSummaryView();
+        } else {
+            DOM.scheduleView.classList.remove('hidden');
+            DOM.summaryView.classList.add('hidden');
+            const today = new Date(); 
+            DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); 
+            DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); 
+            renderSubjects(); 
+            renderProgress(); 
+            renderCountdown(); 
         }
     };
-
-    const formatHoursAndMinutes = (totalHours) => {
-        if (totalHours === 0 || !totalHours) return '0 min';
-        const hours = Math.floor(totalHours);
-        const minutes = Math.round((totalHours - hours) * 60);
-        const hourString = hours > 0 ? `${hours} hr` : '';
-        const minuteString = minutes > 0 ? `${minutes} min` : '';
-        return [hourString, minuteString].filter(Boolean).join(' ');
-    };
-
-    const formatHoursAndMinutesCompact = (totalHours) => {
-        if (totalHours === 0 || !totalHours) return '0m';
-        const hours = Math.floor(totalHours);
-        const minutes = Math.round((totalHours - hours) * 60);
-        if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
-        if (hours > 0) return `${hours}h`;
-        return `${minutes}m`;
-    };
-
-    const createSmallProgressCircle = (progress) => {
-        const size = 36; const sw = 4; const r = (size / 2) - (sw / 2); const circ = 2 * Math.PI * r; const o = circ - (progress / 100) * circ;
-        return `<svg class="w-9 h-9 flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle></svg>`;
-    };
-
-    const createProgressCircle = (progress, textContent = '') => { 
-        const size = 56; const sw = 6; const r = (size / 2) - (sw / 2); const circ = 2 * Math.PI * r; const o = circ - (progress / 100) * circ;
-        const text = textContent ? `<text x="50%" y="50%" dy=".3em" text-anchor="middle" class="text-[11px] font-bold" fill="var(--text-primary)">${textContent}</text>` : ''; 
-        return `<svg class="w-full h-full flex-shrink-0" viewBox="0 0 ${size} ${size}"><circle class="progress-circle-bg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none"></circle><circle class="progress-circle-fg" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}" fill="none" stroke-dasharray="${circ}" stroke-dashoffset="${o}"></circle>${text}</svg>`; 
-    };
     
-    const render = () => { document.documentElement.setAttribute('data-theme', state.settings.theme); document.documentElement.setAttribute('data-accent', state.settings.accent); const today = new Date(); DOM.todayDate.textContent = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); DOM.todayDay.textContent = today.toLocaleDateString('en-US', { weekday: 'long' }); renderSubjects(); renderProgress(); renderCountdown(); };
-    
-    const renderSubjects = () => {
-        const key = formatDateKey(new Date()); const items = state.studyData[key] || [];
-        DOM.subjectsList.innerHTML = ''; DOM.subjectsDoneList.innerHTML = '';
-        const active = items.filter(s => !s.completed); const done = items.filter(s => s.completed);
-        if (items.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No schedule for today. Click 'Generate Schedule'.</p>`;
-        else if (active.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All tasks complete! Great work! 🎉</p>`;
-        active.forEach(item => DOM.subjectsList.innerHTML += createItemHTML(item));
-        done.forEach(item => DOM.subjectsDoneList.innerHTML += createItemHTML(item));
-        DOM.completedSubjectsContainer.classList.toggle('hidden', done.length === 0);
-    };
-
-    const createItemHTML = (item) => {
-        if (item.type === 'break') return createBreakHTML(item);
-        return createSubjectHTML(item);
-    };
-    
-    const createBreakHTML = (item) => {
-        const endTime = calculateEndTime(item.startTime, item.durationHours);
-        const timeRangeString = `${formatTime(item.startTime)} - ${formatTime(endTime)}`;
-        return `
-            <div class="break-item rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-secondary shadow-sm ${item.completed ? 'completed opacity-60' : ''}" data-item-id="${item.id}" draggable="true">
-                <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
-                <div data-action="toggleMainCompletion" data-item-id="${item.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${item.completed ? 'completed' : ''}"></div>
-                <div class="flex items-center gap-2 flex-grow min-w-0">
-                    <i class="fas fa-coffee text-xl text-subtle"></i>
-                    <div class="flex flex-col items-start">
-                        <span class="font-bold text-main cursor-pointer hover:opacity-75 truncate" data-action="editBreakText" data-item-id="${item.id}" title="Click to edit reason">${item.text || 'Break'}</span>
-                        <span class="text-sm text-subtle" title="Click to edit duration" data-action="openModal" data-modal="edit-hours-modal" data-item-id="${item.id}">${timeRangeString} (${formatHoursAndMinutes(item.durationHours)})</span>
-                    </div>
-                </div>
-                <button data-action="deleteItem" data-item-id="${item.id}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button>
-            </div>`;
-    };
-
+    const renderSubjects = () => { const key = formatDateKey(new Date()); const items = state.studyData[key] || []; DOM.subjectsList.innerHTML = ''; DOM.subjectsDoneList.innerHTML = ''; const active = items.filter(s => !s.completed); const done = items.filter(s => s.completed); if (items.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">No schedule for today. Click 'Generate Schedule'.</p>`; else if (active.length === 0) DOM.subjectsList.innerHTML = `<p class="text-subtle text-center py-4">All tasks complete! Great work! 🎉</p>`; active.forEach(item => DOM.subjectsList.innerHTML += createItemHTML(item)); done.forEach(item => DOM.subjectsDoneList.innerHTML += createItemHTML(item)); DOM.completedSubjectsContainer.classList.toggle('hidden', done.length === 0); };
+    const createItemHTML = (item) => { if (item.type === 'break') return createBreakHTML(item); return createSubjectHTML(item); };
+    const createBreakHTML = (item) => { const endTime = calculateEndTime(item.startTime, item.durationHours); const timeRangeString = `${formatTime(item.startTime)} - ${formatTime(endTime)}`; return ` <div class="break-item rounded-xl p-3 sm:p-4 flex items-center gap-3 border border-secondary shadow-sm ${item.completed ? 'completed opacity-60' : ''}" data-item-id="${item.id}" draggable="true"> <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span> <div data-action="toggleMainCompletion" data-item-id="${item.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${item.completed ? 'completed' : ''}"></div> <div class="flex items-center gap-2 flex-grow min-w-0"> <i class="fas fa-coffee text-xl text-subtle"></i> <div class="flex flex-col items-start"> <span class="font-bold text-main cursor-pointer hover:opacity-75 truncate" data-action="editBreakText" data-item-id="${item.id}" title="Click to edit reason">${item.text || 'Break'}</span> <span class="text-sm text-subtle" title="Click to edit duration" data-action="openModal" data-modal="edit-hours-modal" data-item-id="${item.id}">${timeRangeString} (${formatHoursAndMinutes(item.durationHours)})</span> </div> </div> <button data-action="deleteItem" data-item-id="${item.id}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button> </div>`; };
     const createSubjectHTML = (subject) => {
         const isPanelOpen = state.ui.openSubTaskPanels.has(subject.id);
         const subTaskProgress = subject.subTasks.length > 0 ? (subject.subTasks.filter(t => t.completed).length / subject.subTasks.length) * 100 : 0;
         const progress = subject.completed ? 100 : subTaskProgress;
-        const endTime = calculateEndTime(subject.startTime, subject.durationHours);
-        const timeRangeString = `${formatTime(subject.startTime)} - ${formatTime(endTime)}`;
-        return `
-            <div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-item-id="${subject.id}">
-                <div class="flex items-center p-3 sm:p-4 gap-2 sm:gap-3">
-                    <span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span>
-                    <div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div>
-                    <div class="flex-grow min-w-0">
-                        <div class="flex items-center gap-3">
-                            <label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label>
-                        </div>
-                        <span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-semibold text-sm cursor-pointer" style="color: var(--accent-primary);">${timeRangeString}</span>
-                    </div>
-                    <div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer w-12 h-12 sm:w-14 sm:h-14" title="Edit time for ${subject.name}">
-                        ${createProgressCircle(progress, formatHoursAndMinutesCompact(subject.durationHours))}
-                    </div>
-                    <button data-action="toggleSubTaskPanel" data-item-id="${subject.id}" class="p-1 rounded-full hover:bg-border-primary transition-colors">
-                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>
-                </div>
-                <div class="subtask-container px-4 pb-4 border-t border-secondary ${isPanelOpen ? '' : 'hidden'}">
-                    ${isPanelOpen ? createSubTasksHTML(subject) : ''}
-                </div>
-            </div>`;
+        const displayDuration = subject.originalDuration !== undefined ? subject.originalDuration : subject.durationHours;
+        const plannedEndTime = calculateEndTime(subject.startTime, displayDuration);
+        const timeRangeString = `${formatTime(subject.startTime)} - ${formatTime(plannedEndTime)}`;
+        let timeDisplayHTML;
+        if (subject.completed && subject.finishedAt) {
+            const finishedTime = formatTime(new Date(subject.finishedAt));
+            timeDisplayHTML = `<div class="flex items-baseline gap-2 flex-wrap"><span class="whitespace-nowrap font-semibold text-sm" style="color: var(--accent-primary);">Finished at <strong>${finishedTime}</strong></span><span class="text-xs text-subtle"> (was ${timeRangeString})</span></div>`;
+        } else {
+            timeDisplayHTML = `<span data-action="editStartTime" data-item-id="${subject.id}" title="Edit start time" class="time-display whitespace-nowrap font-semibold text-sm cursor-pointer" style="color: var(--accent-primary);">${timeRangeString}</span>`;
+        }
+        return `<div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-item-id="${subject.id}"><div class="flex items-center p-3 sm:p-4 gap-2 sm:gap-3"><span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span><div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div><div class="flex-grow min-w-0"><div class="flex items-center gap-3"><label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label></div>${timeDisplayHTML}</div><div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer w-12 h-12 sm:w-14 sm:h-14" title="Edit time for ${subject.name}">${createProgressCircle(progress, formatHoursAndMinutesCompact(displayDuration))}</div><button data-action="toggleSubTaskPanel" data-item-id="${subject.id}" class="p-1 rounded-full hover:bg-border-primary transition-colors"><svg class="w-5 h-5 sm:w-6 sm:h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button></div><div class="subtask-container px-4 pb-4 border-t border-secondary ${isPanelOpen ? '' : 'hidden'}">${isPanelOpen ? createSubTasksHTML(subject) : ''}</div></div>`;
     };
-    
-    const createSubTasksHTML = (subject) => { 
-        let html = '<div class="space-y-3 pt-3">'; 
-        subject.subTasks.forEach((task, index) => { 
-            html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-item-id="${subject.id}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-item-id="${subject.id}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-item-id="${subject.id}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`; 
-        }); 
-        html += `</div>
-                 <div class="flex items-center justify-between mt-4 gap-2">
-                     <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary flex-grow">
-                     <div class="flex-shrink-0 flex items-center gap-2">
-                         <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs">
-                             <i class="fas fa-copy mr-1"></i> Duplicate
-                         </button>
-                         <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);">
-                             <i class="fas fa-trash-alt mr-1"></i> Delete
-                         </button>
-                     </div>
-                 </div>`; 
-        return html; 
-    };
-    
-    const renderProgress = () => {
-        const key = formatDateKey(new Date()); const items = (state.studyData[key] || []).filter(item => item.type === 'subject');
-        const totalHours = items.reduce((s, c) => s + c.durationHours, 0);
-        const completedHours = items.reduce((s, c) => { if (c.completed) return s + c.durationHours; if (c.subTasks.length > 0) return s + (c.durationHours / c.subTasks.length) * c.subTasks.filter(t => t.completed).length; return s; }, 0);
-        const progress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0;
-        DOM.progressSummary.innerHTML = `<span class="text-sm font-semibold whitespace-nowrap">${formatHoursAndMinutes(completedHours)} / ${formatHoursAndMinutes(totalHours)}</span> ${createSmallProgressCircle(progress)}`;
-        renderMotivationMessage(totalHours - completedHours);
-    };
-
+    const createSubTasksHTML = (subject) => { let html = '<div class="space-y-3 pt-3">'; subject.subTasks.forEach((task, index) => { html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-item-id="${subject.id}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-item-id="${subject.id}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-item-id="${subject.id}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`; }); html += `</div> <div class="flex items-center justify-between mt-4 gap-2"> <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary flex-grow"> <div class="flex-shrink-0 flex items-center gap-2"> <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs"> <i class="fas fa-copy mr-1"></i> Duplicate </button> <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);"> <i class="fas fa-trash-alt mr-1"></i> Delete </button> </div> </div>`; return html; };
+    const renderProgress = () => { const key = formatDateKey(new Date()); const items = (state.studyData[key] || []).filter(item => item.type === 'subject'); const totalHours = items.reduce((s, c) => s + c.durationHours, 0); const completedHours = items.reduce((s, c) => { if (c.completed) return s + c.durationHours; if (c.subTasks.length > 0) return s + (c.durationHours / c.subTasks.length) * c.subTasks.filter(t => t.completed).length; return s; }, 0); const progress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0; DOM.progressSummary.innerHTML = `<span class="text-sm font-semibold whitespace-nowrap">${formatHoursAndMinutes(completedHours)} / ${formatHoursAndMinutes(totalHours)}</span> ${createSmallProgressCircle(progress)}`; renderMotivationMessage(totalHours - completedHours); };
     let countdownInterval = null;
     const renderCountdown = () => { if (countdownInterval) clearInterval(countdownInterval); if (!state.settings.sessionEndTime) { DOM.sessionCountdown.textContent = '--:--:--'; return; } const update = () => { const now = new Date(); const end = new Date(); const [h, m] = state.settings.sessionEndTime.split(':'); end.setHours(parseInt(h), parseInt(m), 0, 0); const diff = end.getTime() - now.getTime(); if (diff <= 0) { DOM.sessionCountdown.textContent = '00:00:00'; clearInterval(countdownInterval); return; } const hr = Math.floor(diff / 3600000).toString().padStart(2, '0'); const min = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0'); const sec = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0'); DOM.sessionCountdown.textContent = `${hr}:${min}:${sec}`; }; update(); countdownInterval = setInterval(update, 1000); };
-    
-    const renderMotivationMessage = (remHours) => {
-        if (!state.settings.sessionEndTime) { DOM.sessionMotivation.innerHTML = 'Set an end time to begin.'; return; }
-        if (remHours <= 0) { DOM.sessionMotivation.innerHTML = "All tasks done! You're amazing! 🚀"; return; }
-        const now = new Date(); const end = new Date(); const [h, m] = state.settings.sessionEndTime.split(':'); end.setHours(parseInt(h), parseInt(m), 0, 0); const diffMs = end.getTime() - now.getTime();
-        let msg = `You have <strong>${formatHoursAndMinutes(remHours)}</strong> of tasks left.`;
-        if (diffMs > 0) {
-            const sessionMinsLeft = diffMs / 60000; msg += ` Session ends in <strong>${formatHoursAndMinutes(sessionMinsLeft / 60)}</strong>.`;
-            if (remHours * 60 > sessionMinsLeft) { msg += ` <span style="color: var(--accent-danger);">Time to focus!</span>`; } else { msg += ` <span style="color: var(--accent-primary);">You're on track!</span>`; }
-        } else { msg += ` Session has ended. Great work!`; }
-        DOM.sessionMotivation.innerHTML = msg;
-    };
+    const renderMotivationMessage = (remHours) => { if (!state.settings.sessionEndTime) { DOM.sessionMotivation.innerHTML = 'Set an end time to begin.'; return; } if (remHours <= 0) { DOM.sessionMotivation.innerHTML = "All tasks done! You're amazing! 🚀"; return; } const now = new Date(); const end = new Date(); const [h, m] = state.settings.sessionEndTime.split(':'); end.setHours(parseInt(h), parseInt(m), 0, 0); const diffMs = end.getTime() - now.getTime(); let msg = `You have <strong>${formatHoursAndMinutes(remHours)}</strong> of tasks left.`; if (diffMs > 0) { const sessionMinsLeft = diffMs / 60000; msg += ` Session ends in <strong>${formatHoursAndMinutes(sessionMinsLeft / 60)}</strong>.`; if (remHours * 60 > sessionMinsLeft) { msg += ` <span style="color: var(--accent-danger);">Time to focus!</span>`; } else { msg += ` <span style="color: var(--accent-primary);">You're on track!</span>`; } } else { msg += ` Session has ended. Great work!`; } DOM.sessionMotivation.innerHTML = msg; };
 
+    // --- Summary View Logic ---
+    const setupSummaryView = () => {
+        DOM.summaryFilter.onchange = (e) => renderSummaryChart(e.target.value);
+        renderSummaryChart(DOM.summaryFilter.value);
+    };
+    const calculateSummaryData = (filter = 'overall') => {
+        const summary = {};
+        Object.values(state.studyData).forEach(day => {
+            day.forEach(item => {
+                if (item.type !== 'subject' || !item.completed) return;
+                const durationForCalc = item.originalDuration !== undefined ? item.originalDuration : item.durationHours;
+                if (filter === 'overall') {
+                    summary[item.name] = (summary[item.name] || 0) + durationForCalc;
+                } else {
+                    if (!item.subTasks || item.subTasks.length === 0) return;
+                    const hoursPerTask = durationForCalc / item.subTasks.length;
+                    item.subTasks.forEach(task => {
+                        if (task.status === filter) {
+                            summary[item.name] = (summary[item.name] || 0) + hoursPerTask;
+                        }
+                    });
+                }
+            });
+        });
+        const labels = Object.keys(summary);
+        const data = Object.values(summary);
+        return { labels, data };
+    };
+    const generateVibrantColors = (count) => {
+        const colors = [];
+        const hueStep = 360 / count;
+        for (let i = 0; i < count; i++) {
+            const hue = i * hueStep;
+            colors.push(`hsl(${hue}, 85%, 60%)`);
+        }
+        return colors;
+    };
+    const renderSummaryChart = (filter) => {
+        if (summaryChartInstance) {
+            summaryChartInstance.destroy();
+        }
+        const { labels, data } = calculateSummaryData(filter);
+        const colors = generateVibrantColors(labels.length);
+        const totalHours = data.reduce((sum, value) => sum + value, 0);
+
+        DOM.customLegend.innerHTML = ''; 
+        
+        if (labels.length === 0) {
+            DOM.chartCenterText.innerHTML = `<div class="text-subtle">No Data</div>`;
+            DOM.customLegend.innerHTML = `<p class="text-subtle text-center w-full">No completed data found for the "${filter}" category.</p>`;
+            return;
+        }
+
+        DOM.chartCenterText.innerHTML = `<div class="font-bold text-3xl text-main">${formatHoursAndMinutesCompact(totalHours)}</div>`;
+
+        const sortedData = labels.map((label, index) => ({
+            label, 
+            value: data[index],
+            color: colors[index]
+        })).sort((a,b) => b.value - a.value);
+
+        sortedData.forEach(item => {
+            DOM.customLegend.innerHTML += `
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span class="w-3 h-3 rounded-full" style="background-color: ${item.color}"></span>
+                        <span class="font-semibold text-main">${item.label}</span>
+                    </div>
+                    <span class="font-medium text-subtle">${formatHoursAndMinutesCompact(item.value)}</span>
+                </div>
+            `;
+        });
+
+        const ctx = document.getElementById('summary-chart').getContext('2d');
+        summaryChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: getComputedStyle(document.body).getPropertyValue('--bg-tertiary'),
+                    borderWidth: 4,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '75%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed !== null) {
+                                    label += formatHoursAndMinutes(context.parsed);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+    
+    // --- Modals and Actions ---
     const openModal = (id, payload = null) => { const modal = document.getElementById(id); if (!modal) return; if (id === 'manage-subjects-modal') setupManageSubjectsModal(); if (id === 'edit-subjects-modal') setupEditSubjectsModal(); if (id === 'generate-schedule-modal') setupGenerateScheduleModal(); if (id === 'session-end-time-modal') setupEndTimeModal(); if (id === 'theme-modal') setupThemeModal(); if (id === 'edit-hours-modal') setupEditHoursModal(payload); state.ui.currentModal = modal; modal.classList.remove('hidden'); };
     const closeModal = () => { if (state.ui.currentModal) { state.ui.currentModal.classList.add('hidden'); state.ui.currentModal = null; } };
     const setupManageSubjectsModal = () => DOM.masterSubjectsList.innerHTML = state.masterSubjects.map(s => `<div class="flex items-center justify-between p-1"><label class="text-main">${s}</label><button data-action="deleteMasterSubject" data-subject-name="${s}" class="text-subtle font-bold text-xl px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`).join('');
-    const setupEditSubjectsModal = () => { const key = formatDateKey(new Date()); const current = (state.studyData[key] || []).filter(i => i.type === 'subject').map(s => s.name); DOM.subjectsChecklist.innerHTML = state.masterSubjects.map(s => `<div class="flex items-center"><input type="checkbox" id="edit-${s}" value="${s}" class="w-4 h-4" ${current.includes(s)?'checked':''}><label for="edit-${s}" class="ml-2 text-sm font-medium text-main">${s}</label></div>`).join(''); };
+    const setupEditSubjectsModal = () => { state.ui.swapState = { active: false, subjectToSwap: null }; const key = formatDateKey(new Date()); const currentSubjects = (state.studyData[key] || []).filter(i => i.type === 'subject').map(s => s.name); DOM.subjectsChecklist.innerHTML = state.masterSubjects.map(s => { const isCurrent = currentSubjects.includes(s); return `<div class="flex items-center p-1 transition-all duration-200" data-subject-name="${s}" data-is-current="${isCurrent}"><input type="checkbox" id="edit-${s}" value="${s}" class="w-4 h-4" ${isCurrent ? 'checked' : ''}><label for="edit-${s}" class="ml-2 text-sm font-medium text-main">${s}</label></div>`; }).join(''); DOM.subjectsChecklist.onclick = handleEditModalClick; DOM.subjectsChecklist.ondblclick = handleEditModalDblClick; };
+    const handleEditModalDblClick = (e) => { const targetDiv = e.target.closest('[data-subject-name]'); if (!targetDiv) return; const subjectName = targetDiv.dataset.subjectName; const isCurrent = targetDiv.dataset.isCurrent === 'true'; DOM.subjectsChecklist.querySelectorAll('.swap-active').forEach(el => el.classList.remove('swap-active')); if (isCurrent) { state.ui.swapState = { active: true, subjectToSwap: subjectName }; targetDiv.classList.add('swap-active'); } else { state.ui.swapState = { active: false, subjectToSwap: null }; } };
+    const handleEditModalClick = (e) => { if (!state.ui.swapState.active) return; const targetDiv = e.target.closest('[data-subject-name]'); if (!targetDiv) { state.ui.swapState = { active: false, subjectToSwap: null }; DOM.subjectsChecklist.querySelector('.swap-active')?.classList.remove('swap-active'); return; } e.preventDefault(); const newSubjectName = targetDiv.dataset.subjectName; const isCurrent = targetDiv.dataset.isCurrent === 'true'; if (!isCurrent) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; schedule.forEach(item => { if (item.type === 'subject' && item.name === state.ui.swapState.subjectToSwap) { item.name = newSubjectName; } }); state.ui.swapState = { active: false, subjectToSwap: null }; closeModal(); render(); enhancedSaveState(); } else { state.ui.swapState = { active: false, subjectToSwap: null }; targetDiv.classList.remove('swap-active'); } };
     const setupEndTimeModal = () => DOM.sessionEndTimeInput.value = state.settings.sessionEndTime;
-    
-    const setupEditHoursModal = (itemId) => {
-        const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId);
-        if(item) {
-            DOM.hoursInput.dataset.itemId = item.id;
-            if (item.type === 'subject') {
-                DOM.editHoursTitle.textContent = "Set Duration (Hours)";
-                DOM.editHoursSubjectName.textContent = item.name;
-                DOM.editHoursSubjectName.style.display = 'block';
-                DOM.hoursInput.value = item.durationHours;
-                DOM.hoursInput.min = "0.25";
-                DOM.hoursInput.step = "0.25";
-            } else if (item.type === 'break') {
-                DOM.editHoursTitle.textContent = "Set Break Duration (Mins)";
-                DOM.editHoursSubjectName.style.display = 'none';
-                DOM.hoursInput.value = item.durationHours * 60;
-                DOM.hoursInput.min = "5";
-                DOM.hoursInput.step = "5";
-            }
-        }
-    };
-
+    const setupEditHoursModal = (itemId) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if(item) { DOM.hoursInput.dataset.itemId = item.id; if (item.type === 'subject') { DOM.editHoursTitle.textContent = "Set Duration (Hours)"; DOM.editHoursSubjectName.textContent = item.name; DOM.editHoursSubjectName.style.display = 'block'; DOM.hoursInput.value = item.durationHours; item.originalDuration = item.durationHours; DOM.hoursInput.min = "0.25"; DOM.hoursInput.step = "0.25"; } else if (item.type === 'break') { DOM.editHoursTitle.textContent = "Set Break Duration (Mins)"; DOM.editHoursSubjectName.style.display = 'none'; DOM.hoursInput.value = item.durationHours * 60; item.originalDuration = item.durationHours; DOM.hoursInput.min = "5"; DOM.hoursInput.step = "5"; } } };
     const setupThemeModal = () => { const a = [ { n: 'green', c: '#22c55e' }, { n: 'blue', c: '#3b82f6' }, { n: 'purple', c: '#a855f7' }, { n: 'red', c: '#ef4444' } ]; DOM.themeOptions.innerHTML = `<div><h5 class="text-sm font-bold text-subtle mb-3">Theme</h5><div class="grid grid-cols-2 gap-4"><button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme==='light'?'border-2 border-main':''}" style="${state.settings.theme==='light'?'border-color: var(--accent-primary)':''}">Light</button><button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme==='dark'?'border-2 border-main':''}" style="${state.settings.theme==='dark'?'border-color: var(--accent-primary)':''}">Dark</button></div></div><div><h5 class="text-sm font-bold text-subtle mb-3">Accent</h5><div class="flex items-center justify-around gap-4">${a.map(x=>`<button data-action="setAccent" data-accent="${x.n}" class="w-12 h-12 rounded-full ${state.settings.accent===x.n?'ring-2 ring-offset-2 ring-offset-bg-main':''}" style="background-color:${x.c}; ${state.settings.accent===x.n?'border-color: var(--accent-primary)':''}"></button>`).join('')}</div></div>`; };
-    
-    const setupGenerateScheduleModal = () => {
-        state.scheduleParams = { startTime: null, subjectCount: null, defaultDuration: null };
-        const createOptionItems = (container, options, dataAttr, settingKey) => { container.innerHTML = options.map(opt => `<div class="option-item" data-action="handleOptionSelection" data-${dataAttr}="${opt.value}" data-setting-key="${settingKey}">${opt.label}</div>`).join(''); };
-        const timeOptions = [];
-        for (let i = 6; i <= 21; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); }
-        createOptionItems(DOM.startTimeSelection, timeOptions, 'time', 'startTime');
-        createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3, 3.5 , 4 , 5].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration');
-        createOptionItems(DOM.subjectCountSelection, Array.from({ length: state.masterSubjects.length }, (_, i) => ({ label: i + 1, value: i + 1 })), 'count', 'subjectCount');
-        DOM.confirmGenerateBtn.disabled = true;
-    };
+    const setupGenerateScheduleModal = () => { state.scheduleParams = { startTime: null, subjectCount: null, defaultDuration: null }; const createOptionItems = (container, options, dataAttr, settingKey) => { container.innerHTML = options.map(opt => `<div class="option-item" data-action="handleOptionSelection" data-${dataAttr}="${opt.value}" data-setting-key="${settingKey}">${opt.label}</div>`).join(''); }; const timeOptions = []; for (let i = 6; i <= 21; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); } createOptionItems(DOM.startTimeSelection, timeOptions, 'time', 'startTime'); createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3, 3.5 , 4 , 5].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration'); createOptionItems(DOM.subjectCountSelection, Array.from({ length: state.masterSubjects.length }, (_, i) => ({ label: i + 1, value: i + 1 })), 'count', 'subjectCount'); DOM.confirmGenerateBtn.disabled = true; };
 
     const actions = {
-        // --- P2P ACTIONS ---
-        generateSyncCode: () => {
-            if (state.p2p.peer) state.p2p.peer.destroy();
-            const peer = new Peer();
-            state.p2p.peer = peer;
-            setupPeerListeners(peer);
-            
-            peer.on('open', (id) => {
-                DOM.qrCodeContainer.innerHTML = '';
-                const qr = qrcode(0, 'L');
-                qr.addData(id);
-                qr.make();
-                DOM.qrCodeContainer.innerHTML = qr.createImgTag(5);
-                openModal('qr-code-modal');
-                updateP2PStatus('connecting');
-            });
-        },
-        startScanToSync: () => {
-            if (state.p2p.peer) state.p2p.peer.destroy();
-            const peer = new Peer();
-            state.p2p.peer = peer;
-            setupPeerListeners(peer);
-
-            const onScanSuccess = (decodedText, decodedResult) => {
-                actions.stopScanToSync();
-                const conn = state.p2p.peer.connect(decodedText);
-                if (state.p2p.connection) {
-                    state.p2p.connection.close();
-                }
-                state.p2p.connection = conn;
-                setupConnectionListeners(conn);
-                updateP2PStatus('connecting');
-            };
-
-            const html5QrcodeScanner = new Html5Qrcode("qr-reader");
-            state.p2p.scanner = html5QrcodeScanner;
-            html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, (errorMessage) => {});
-            openModal('qr-scanner-modal');
-        },
-        stopScanToSync: () => {
-            if (state.p2p.scanner && state.p2p.scanner.isScanning) {
-                state.p2p.scanner.stop().then(() => {}).catch(err => {});
-            }
-            closeModal();
-        },
-        // --- END P2P ACTIONS ---
-
+        showScheduleView: () => { state.ui.currentView = 'schedule'; render(); },
+        showSummaryView: () => { state.ui.currentView = 'summary'; render(); },
+        generateSyncCode: () => { if (state.p2p.peer) state.p2p.peer.destroy(); const peer = new Peer(); state.p2p.peer = peer; setupPeerListeners(peer); peer.on('open', (id) => { DOM.qrCodeContainer.innerHTML = ''; const qr = qrcode(0, 'L'); qr.addData(id); qr.make(); DOM.qrCodeContainer.innerHTML = qr.createImgTag(5); openModal('qr-code-modal'); updateP2PStatus('connecting'); }); },
+        startScanToSync: () => { if (state.p2p.peer) state.p2p.peer.destroy(); const peer = new Peer(); state.p2p.peer = peer; setupPeerListeners(peer); const onScanSuccess = (decodedText, decodedResult) => { actions.stopScanToSync(); const conn = state.p2p.peer.connect(decodedText); if (state.p2p.connection) { state.p2p.connection.close(); } state.p2p.connection = conn; setupConnectionListeners(conn); updateP2PStatus('connecting'); }; const html5QrcodeScanner = new Html5Qrcode("qr-reader"); state.p2p.scanner = html5QrcodeScanner; html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, (errorMessage) => {}); openModal('qr-scanner-modal'); },
+        stopScanToSync: () => { if (state.p2p.scanner && state.p2p.scanner.isScanning) { state.p2p.scanner.stop().then(() => {}).catch(err => {}); } closeModal(); },
         toggleSidebar: () => { const isOpen = DOM.sidebar.classList.contains('open'); if (isOpen) { DOM.sidebar.classList.remove('open'); DOM.sidebarOverlay.classList.add('opacity-0'); setTimeout(() => DOM.sidebarOverlay.classList.add('hidden'), 300); } else { DOM.sidebarOverlay.classList.remove('hidden'); setTimeout(() => { DOM.sidebar.classList.add('open'); DOM.sidebarOverlay.classList.remove('opacity-0'); }, 10); } },
         openModal: (el) => openModal(el.dataset.modal, el.dataset.itemId),
         closeModal: () => closeModal(),
@@ -688,217 +455,85 @@ document.addEventListener('DOMContentLoaded', () => {
         setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); enhancedSaveState(); },
         addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); enhancedSaveState(); } },
         deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); enhancedSaveState(); },
-        
-        editStartTime: (el) => {
-            const itemId = el.dataset.itemId;
-            const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
-            if (!item) return;
-            const container = el.parentElement;
-            const input = document.createElement('input');
-            input.type = 'time';
-            input.className = 'input-main text-sm p-0.5 w-24 rounded-md';
-            input.value = formatTimeTo24hr(item.startTime);
-            container.replaceChild(input, el);
-            input.focus();
-            const saveTime = () => {
-                const [newHour, newMinute] = input.value.split(':');
-                if (newHour && newMinute) {
-                    item.startTime.setHours(parseInt(newHour), parseInt(newMinute));
-                    const schedule = state.studyData[formatDateKey(new Date())];
-                    const itemIndex = schedule.findIndex(i => i.id == itemId);
-                    recalculateStartTimes(itemIndex + 1);
-                    enhancedSaveState();
-                }
-                render(); 
-            };
-            input.addEventListener('blur', saveTime);
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') input.blur();
-                if (e.key === 'Escape') { input.removeEventListener('blur', saveTime); render(); }
-            });
-        },
-        editBreakText: (el) => {
-            const itemId = el.dataset.itemId;
-            const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId);
-            if (!item || item.type !== 'break') return;
-            const container = el.parentElement;
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow';
-            input.value = item.text || 'Break';
-            container.replaceChild(input, el);
-            input.focus();
-            input.select();
-            const saveAndExit = () => {
-                const newText = input.value.trim();
-                item.text = newText || 'Break';
-                enhancedSaveState();
-                render();
-            };
-            input.addEventListener('blur', saveAndExit);
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') input.blur();
-                if (e.key === 'Escape') { input.removeEventListener('blur', saveAndExit); render(); }
-            });
-        },
-        confirmEditSubjects: () => {
-            const key = formatDateKey(new Date());
-            const originalSchedule = state.studyData[key] || [];
-            if (originalSchedule.length === 0) { closeModal(); return; }
-            const sessionStartTime = originalSchedule[0].startTime;
-            const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value);
-            let newSchedule = originalSchedule.filter(item => item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name)));
-            const currentNames = newSchedule.map(item => item.name);
-            selectedNames.forEach(name => {
-                if (!currentNames.includes(name)) {
-                    newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: state.settings.defaultDuration || 1, completed: false, subTasks: [], startTime: null });
-                }
-            });
-            if (newSchedule.length > 0) { newSchedule[0].startTime = sessionStartTime; }
-            state.studyData[key] = newSchedule;
-            recalculateStartTimes(1);
-            closeModal();
-            render();
-            enhancedSaveState();
-        },
-
-        confirmEditHours: (el) => {
-            const itemId = DOM.hoursInput.dataset.itemId;
-            const value = parseFloat(DOM.hoursInput.value);
-            if (itemId && !isNaN(value) && value >= 0) {
-                const key = formatDateKey(new Date());
-                const schedule = state.studyData[key] || [];
-                const item = schedule.find(s => s.id == itemId);
-                if (item) {
-                    if (item.type === 'break') { item.durationHours = value / 60; } 
-                    else { item.durationHours = value; }
-                    if (item.type === 'subject') distributeSubTaskHours(item);
-                    const itemIndex = schedule.indexOf(item);
-                    recalculateStartTimes(itemIndex + 1);
-                }
-                closeModal(); render(); enhancedSaveState();
-            } else {
-                DOM.hoursInput.classList.add('border-red-500');
-                setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500);
-            }
-        },
-        toggleMainCompletion: (el) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (item) { item.completed = !item.completed; if(item.type === 'subject') item.subTasks.forEach(t => t.completed = item.completed); render(); enhancedSaveState(); } },
-        toggleSubTaskPanel: (el) => { 
-            const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); 
-            if(subject) { 
-                const id = subject.id; 
-                if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); 
-                else state.ui.openSubTaskPanels.add(id); 
-                renderSubjects(); 
-                enhancedSaveState();
-            } 
-        },
+        editStartTime: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item) return; const container = el.parentElement; const input = document.createElement('input'); input.type = 'time'; input.className = 'input-main text-sm p-0.5 w-24 rounded-md'; input.value = formatTimeTo24hr(item.startTime); container.replaceChild(input, el); input.focus(); const saveTime = () => { const [newHour, newMinute] = input.value.split(':'); if (newHour && newMinute) { item.startTime.setHours(parseInt(newHour), parseInt(newMinute)); const schedule = state.studyData[formatDateKey(new Date())]; const itemIndex = schedule.findIndex(i => i.id == itemId); recalculateStartTimes(itemIndex + 1); enhancedSaveState(); } render(); }; input.addEventListener('blur', saveTime); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.removeEventListener('blur', saveTime); render(); } }); },
+        editBreakText: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item || item.type !== 'break') return; const container = el.parentElement; const input = document.createElement('input'); input.type = 'text'; input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow'; input.value = item.text || 'Break'; container.replaceChild(input, el); input.focus(); input.select(); const saveAndExit = () => { const newText = input.value.trim(); item.text = newText || 'Break'; enhancedSaveState(); render(); }; input.addEventListener('blur', saveAndExit); input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.removeEventListener('blur', saveAndExit); render(); } }); },
+        confirmEditSubjects: () => { const key = formatDateKey(new Date()); const originalSchedule = state.studyData[key] || []; if (originalSchedule.length === 0) { closeModal(); return; } const sessionStartTime = originalSchedule[0].startTime; const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value); const originalSubjectItems = originalSchedule.filter(i => i.type === 'subject'); const originalCounts = originalSubjectItems.reduce((acc, subject) => { acc[subject.name] = (acc[subject.name] || 0) + 1; return acc; }, {}); const originalNames = Object.keys(originalCounts); const deselectedNames = originalNames.filter(name => !selectedNames.includes(name)); const newlySelectedNames = selectedNames.filter(name => !originalNames.includes(name)); let newSubjectDuplicationCount = 1; if (deselectedNames.length > 0) { const maxCount = Math.max(...deselectedNames.map(name => originalCounts[name])); if (maxCount > 1) { newSubjectDuplicationCount = maxCount; } } let newSchedule = originalSchedule.filter(item => item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))); newlySelectedNames.forEach(name => { for (let i = 0; i < newSubjectDuplicationCount; i++) { newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: state.settings.defaultDuration || 1, completed: false, subTasks: [], startTime: null }); } }); if (newSchedule.length > 0) { newSchedule[0].startTime = sessionStartTime; } state.studyData[key] = newSchedule; recalculateStartTimes(1); closeModal(); render(); enhancedSaveState(); },
+        confirmEditHours: (el) => { const itemId = DOM.hoursInput.dataset.itemId; const value = parseFloat(DOM.hoursInput.value); if (itemId && !isNaN(value) && value >= 0) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == itemId); if (item) { if (item.type === 'break') { item.durationHours = value / 60; } else { item.durationHours = value; } if (item.type === 'subject') distributeSubTaskHours(item); const itemIndex = schedule.indexOf(item); recalculateStartTimes(itemIndex + 1); } closeModal(); render(); enhancedSaveState(); } else { DOM.hoursInput.classList.add('border-red-500'); setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500); } },
+        toggleMainCompletion: (el) => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == el.dataset.itemId); if (item) { const wasCompleted = item.completed; item.completed = !item.completed; if (item.completed && !wasCompleted) { const completionTime = new Date(); if (item.originalDuration === undefined) { item.originalDuration = item.durationHours; } const actualDurationMs = completionTime.getTime() - item.startTime.getTime(); const actualDurationHours = Math.max(actualDurationMs / (1000 * 60 * 60), 1/60); item.durationHours = actualDurationHours; item.finishedAt = completionTime.toISOString(); if (item.type === 'subject') { distributeSubTaskHours(item); } const itemIndex = schedule.findIndex(i => i.id === item.id); recalculateStartTimes(itemIndex + 1); } else if (!item.completed && wasCompleted) { item.finishedAt = null; if (item.originalDuration !== undefined) { item.durationHours = item.originalDuration; } if (item.type === 'subject') { distributeSubTaskHours(item); } const itemIndex = schedule.findIndex(i => i.id === item.id); recalculateStartTimes(itemIndex + 1); } if (item.type === 'subject' && item.subTasks) { item.subTasks.forEach(t => t.completed = item.completed); } render(); enhancedSaveState(); } },
+        toggleSubTaskPanel: (el) => { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if(subject) { const id = subject.id; if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); else state.ui.openSubTaskPanels.add(id); renderSubjects(); enhancedSaveState(); } },
         addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); enhancedSaveState(); } },
         toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); enhancedSaveState(); } },
         deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); enhancedSaveState(); } },
         cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); enhancedSaveState(); } },
-        duplicateSubject: (el) => {
-            const { itemId } = el.dataset;
-            const key = formatDateKey(new Date());
-            const schedule = state.studyData[key] || [];
-            const originalSubject = schedule.find(s => s.id == itemId);
-            if (originalSubject) {
-                const newDuplicate = { id: Date.now() + Math.random(), type: 'subject', name: originalSubject.name, durationHours: originalSubject.durationHours, completed: false, subTasks: [], startTime: null };
-                schedule.push(newDuplicate);
-                recalculateStartTimes(schedule.length - 1);
-                render();
-                enhancedSaveState();
-            }
-        },
+        duplicateSubject: (el) => { const { itemId } = el.dataset; const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const originalSubject = schedule.find(s => s.id == itemId); if (originalSubject) { const newDuplicate = { id: Date.now() + Math.random(), type: 'subject', name: originalSubject.name, durationHours: originalSubject.durationHours, completed: false, subTasks: [], startTime: null }; schedule.push(newDuplicate); recalculateStartTimes(schedule.length - 1); render(); enhancedSaveState(); } },
         confirmEndTime: () => { state.settings.sessionEndTime = DOM.sessionEndTimeInput.value; closeModal(); render(); enhancedSaveState(); },
         resetApp: () => { if (confirm("Are you sure? This will delete all subjects and schedules.")) { localStorage.removeItem('studyPlannerState'); window.location.reload(); } },
-        handleOptionSelection: (el) => {
-            const { settingKey } = el.dataset; const value = el.dataset[Object.keys(el.dataset).find(k => k !== 'action' && k !== 'settingKey')]; const isNumeric = settingKey !== 'startTime';
-            state.scheduleParams[settingKey] = isNumeric ? parseFloat(value) : value;
-            const container = el.parentElement; container.querySelectorAll('.option-item').forEach(child => child.classList.remove('selected')); el.classList.add('selected');
-            DOM.confirmGenerateBtn.disabled = !(state.scheduleParams.startTime && state.scheduleParams.subjectCount && state.scheduleParams.defaultDuration);
-        },
-        confirmGenerateSchedule: () => {
-            const { startTime, subjectCount, defaultDuration } = state.scheduleParams; if (!startTime || !subjectCount || !defaultDuration) return;
-            state.settings.defaultDuration = defaultDuration;
-            const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const randomSubjects = shuffled.slice(0, subjectCount);
-            const [hour, minute] = startTime.split(':'); const scheduleStartTime = new Date(); scheduleStartTime.setHours(parseInt(hour), parseInt(minute), 0, 0);
-            const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null }));
-            if(newSchedule.length > 0) newSchedule[0].startTime = scheduleStartTime;
-            state.studyData[formatDateKey(new Date())] = newSchedule; recalculateStartTimes(1);
-            closeModal(); render(); enhancedSaveState();
-        },
+        handleOptionSelection: (el) => { const { settingKey } = el.dataset; const value = el.dataset[Object.keys(el.dataset).find(k => k !== 'action' && k !== 'settingKey')]; const isNumeric = settingKey !== 'startTime'; state.scheduleParams[settingKey] = isNumeric ? parseFloat(value) : value; const container = el.parentElement; container.querySelectorAll('.option-item').forEach(child => child.classList.remove('selected')); el.classList.add('selected'); DOM.confirmGenerateBtn.disabled = !(state.scheduleParams.startTime && state.scheduleParams.subjectCount && state.scheduleParams.defaultDuration); },
+        confirmGenerateSchedule: () => { const { startTime, subjectCount, defaultDuration } = state.scheduleParams; if (!startTime || !subjectCount || !defaultDuration) return; state.settings.defaultDuration = defaultDuration; const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const randomSubjects = shuffled.slice(0, subjectCount); const [hour, minute] = startTime.split(':'); const scheduleStartTime = new Date(); scheduleStartTime.setHours(parseInt(hour), parseInt(minute), 0, 0); const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null })); if(newSchedule.length > 0) newSchedule[0].startTime = scheduleStartTime; state.studyData[formatDateKey(new Date())] = newSchedule; recalculateStartTimes(1); closeModal(); render(); enhancedSaveState(); },
         addBreak: () => {
             const key = formatDateKey(new Date());
             const schedule = state.studyData[key] || [];
-            if (schedule.length === 0) { alert("Generate a schedule first!"); return; }
+            if (schedule.length === 0) {
+                alert("Generate a schedule first!");
+                return;
+            }
             let insertionIndex = schedule.findIndex(item => !item.completed);
-            if (insertionIndex === -1) insertionIndex = schedule.length;
-            const newBreak = { id: Date.now() + Math.random(), type: 'break', text: 'Break', durationHours: 15 / 60, completed: false, startTime: null };
-            if (insertionIndex === 0 && schedule.length > 0) { newBreak.startTime = schedule[0].startTime; }
+            if (insertionIndex === -1) {
+                insertionIndex = schedule.length;
+            }
+            const newBreak = { 
+                id: Date.now() + Math.random(), 
+                type: 'break', 
+                text: 'Break', 
+                durationHours: 15 / 60, 
+                completed: false, 
+                startTime: null 
+            };
+            if (insertionIndex > 0) {
+                const prevItem = schedule[insertionIndex - 1];
+                newBreak.startTime = calculateEndTime(prevItem.startTime, prevItem.durationHours);
+            } else {
+                newBreak.startTime = schedule[0].startTime;
+            }
             schedule.splice(insertionIndex, 0, newBreak);
             recalculateStartTimes(insertionIndex + 1);
             render();
             enhancedSaveState();
         },
-        deleteItem: (el) => {
-            const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId);
-            if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); enhancedSaveState(); }
-        },
-        exportData: (el) => {
-            const dataToExport = { masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, };
-            const jsonString = JSON.stringify(dataToExport);
-            navigator.clipboard.writeText(jsonString).then(() => {
+        deleteItem: (el) => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId); if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); enhancedSaveState(); } },
+        exportData: (el) => { const dataToExport = { masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, }; const jsonString = JSON.stringify(dataToExport); navigator.clipboard.writeText(jsonString).then(() => { const originalText = el.textContent; el.textContent = 'Copied!'; el.classList.add('btn-primary'); el.classList.remove('btn-secondary'); setTimeout(() => { el.textContent = originalText; el.classList.remove('btn-primary'); el.classList.add('btn-secondary'); }, 2000); }).catch(err => { alert('Failed to copy data.'); console.error('Export error:', err); }); },
+        importData: () => { const jsonString = DOM.importDataTextarea.value.trim(); if (!jsonString) { alert('Please paste your data into the text box.'); return; } try { const importedData = JSON.parse(jsonString); if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) { throw new Error("Data format is incorrect."); } if (confirm('Are you sure you want to import this data? Your current schedule and settings will be overwritten.')) { const newState = { masterSubjects: importedData.masterSubjects, studyData: importedData.studyData, settings: importedData.settings, ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } }; localStorage.setItem('studyPlannerState', JSON.stringify(newState)); alert('Data imported successfully! The app will now reload.'); window.location.reload(); } } catch (error) { alert('Failed to import data. Please check the format and try again.'); console.error('Import error:', error); } },
+        exportSummary: (el) => {
+            const filters = ['overall', 'Lecture', 'Revision', 'Practice', 'Test'];
+            let report = 'Study Summary\n==============\n\n';
+            filters.forEach(filter => {
+                const { labels, data } = calculateSummaryData(filter);
+                const title = filter.charAt(0).toUpperCase() + filter.slice(1);
+                report += `** ${title} Hours **\n`;
+                if (labels.length > 0) {
+                    labels.forEach((label, i) => {
+                        report += `- ${label}: ${formatHoursAndMinutes(data[i])}\n`;
+                    });
+                } else {
+                    report += `- No data\n`;
+                }
+                report += '\n';
+            });
+            navigator.clipboard.writeText(report).then(() => {
                 const originalText = el.textContent;
                 el.textContent = 'Copied!';
-                el.classList.add('btn-primary'); el.classList.remove('btn-secondary');
-                setTimeout(() => { el.textContent = originalText; el.classList.remove('btn-primary'); el.classList.add('btn-secondary'); }, 2000);
-            }).catch(err => { alert('Failed to copy data.'); console.error('Export error:', err); });
-        },
-        importData: () => {
-            const jsonString = DOM.importDataTextarea.value.trim();
-            if (!jsonString) { alert('Please paste your data into the text box.'); return; }
-            try {
-                const importedData = JSON.parse(jsonString);
-                if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) { throw new Error("Data format is incorrect."); }
-                if (confirm('Are you sure you want to import this data? Your current schedule and settings will be overwritten.')) {
-                    const newState = { masterSubjects: importedData.masterSubjects, studyData: importedData.studyData, settings: importedData.settings, ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } };
-                    localStorage.setItem('studyPlannerState', JSON.stringify(newState));
-                    alert('Data imported successfully! The app will now reload.');
-                    window.location.reload();
-                }
-            } catch (error) { alert('Failed to import data. Please check the format and try again.'); console.error('Import error:', error); }
+                setTimeout(() => { el.textContent = originalText; }, 2000);
+            }).catch(err => { alert('Failed to copy summary.'); });
         },
     };
 
     document.body.addEventListener('click', (e) => { const t = e.target.closest('[data-action]'); if (t && actions[t.dataset.action]) actions[t.dataset.action](t); });
     document.body.addEventListener('keydown', (e) => { const t = e.target.closest('[data-action-on-enter]'); if (t && e.key === 'Enter' && actions[t.dataset.actionOnEnter]) { e.preventDefault(); actions[t.dataset.actionOnEnter](t, e); } });
-    
     document.body.addEventListener('dragstart', (e) => { const t = e.target.closest('[data-item-id]'); if (t) { state.ui.draggedItemId = t.dataset.itemId; e.dataTransfer.effectAllowed = 'move'; t.classList.add('dragging'); } });
     document.body.addEventListener('dragend', (e) => { const t = document.querySelector('.dragging'); if (t) t.classList.remove('dragging'); state.ui.draggedItemId = null; });
     document.body.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); if (t && t.dataset.itemId !== state.ui.draggedItemId) { document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); t.classList.add('drag-over'); } });
     document.body.addEventListener('dragleave', (e) => { const t = e.target.closest('[data-item-id]'); if(t) t.classList.remove('drag-over'); });
-    
-    document.body.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const dropTarget = e.target.closest('[data-item-id]');
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        if (dropTarget && state.ui.draggedItemId && dropTarget.dataset.itemId !== state.ui.draggedItemId) {
-            const key = formatDateKey(new Date());
-            const schedule = state.studyData[key];
-            const sessionAnchorTime = schedule.length > 0 ? new Date(schedule[0].startTime.getTime()) : null;
-            const fromIndex = schedule.findIndex(s => s.id == state.ui.draggedItemId);
-            const toIndex = schedule.findIndex(s => s.id == dropTarget.dataset.itemId);
-            if (fromIndex !== -1 && toIndex !== -1) {
-                const [draggedItem] = schedule.splice(fromIndex, 1);
-                schedule.splice(toIndex, 0, draggedItem);
-                if (schedule.length > 0 && sessionAnchorTime) { schedule[0].startTime = sessionAnchorTime; }
-                recalculateStartTimes(1);
-                render();
-                enhancedSaveState();
-            }
-        }
-    });
+    document.body.addEventListener('drop', (e) => { e.preventDefault(); const dropTarget = e.target.closest('[data-item-id]'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); if (dropTarget && state.ui.draggedItemId && dropTarget.dataset.itemId !== state.ui.draggedItemId) { const key = formatDateKey(new Date()); const schedule = state.studyData[key]; const sessionAnchorTime = schedule.length > 0 ? new Date(schedule[0].startTime.getTime()) : null; const fromIndex = schedule.findIndex(s => s.id == state.ui.draggedItemId); const toIndex = schedule.findIndex(s => s.id == dropTarget.dataset.itemId); if (fromIndex !== -1 && toIndex !== -1) { const [draggedItem] = schedule.splice(fromIndex, 1); schedule.splice(toIndex, 0, draggedItem); if (schedule.length > 0 && sessionAnchorTime) { schedule[0].startTime = sessionAnchorTime; } recalculateStartTimes(1); render(); enhancedSaveState(); } } });
     
     const createDragIcon = () => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>`;
     
