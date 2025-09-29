@@ -178,29 +178,29 @@
         <div id="summary-view" class="w-full max-w-3xl bg-main rounded-2xl shadow-lg p-4 sm:p-6 border border-secondary hidden">
             <header class="flex items-center justify-between mb-6 flex-wrap gap-y-3">
                  <div class="flex items-center gap-3">
-                    <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
-                        <svg class="w-6 h-6 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    </button>
-                     <h1 class="text-2xl font-bold text-main">Learning Time</h1>
-                </div>
-                <div class="w-full sm:w-auto">
-                    <select id="summary-filter" class="w-full p-2 input-main">
-                        <option value="overall">Overall Completed</option>
-                        <option value="Lecture">Lecture</option>
-                        <option value="Revision">Revision</option>
-                        <option value="Practice">Practice</option>
-                        <option value="Test">Test</option>
-                    </select>
-                </div>
+                     <button data-action="toggleSidebar" class="p-2 rounded-full hover:bg-tertiary transition-colors">
+                         <svg class="w-6 h-6 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                     </button>
+                      <h1 class="text-2xl font-bold text-main">Learning Time</h1>
+                 </div>
+                 <div class="w-full sm:w-auto">
+                     <select id="summary-filter" class="w-full p-2 input-main">
+                         <option value="overall">Overall Completed</option>
+                         <option value="Lecture">Lecture</option>
+                         <option value="Revision">Revision</option>
+                         <option value="Practice">Practice</option>
+                         <option value="Test">Test</option>
+                     </select>
+                 </div>
             </header>
             <div class="bg-tertiary p-4 sm:p-6 rounded-xl">
                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                    <div id="summary-chart-container" class="relative mx-auto w-full max-w-xs h-auto aspect-square">
-                        <canvas id="summary-chart"></canvas>
-                        <div id="chart-center-text" class="text-center"></div>
-                    </div>
-                    <div id="custom-legend" class="space-y-3"></div>
-                </div>
+                     <div id="summary-chart-container" class="relative mx-auto w-full max-w-xs h-auto aspect-square">
+                         <canvas id="summary-chart"></canvas>
+                         <div id="chart-center-text" class="text-center"></div>
+                     </div>
+                     <div id="custom-legend" class="space-y-3"></div>
+                 </div>
             </div>
              <button data-action="exportSummary" class="btn btn-secondary w-full !mt-6">Export Summary to Clipboard</button>
         </div>
@@ -260,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Core Utilities & State Management ---
     const updateP2PStatus = (status) => { DOM.p2pStatus.classList.remove('hidden'); DOM.p2pStatusIndicator.className = status; };
     const setupPeerListeners = (peer) => { peer.on('open', (id) => console.log('My peer ID is: ' + id)); peer.on('connection', (conn) => { console.log('Received incoming connection'); if (state.p2p.connection) { state.p2p.connection.close(); } state.p2p.connection = conn; setupConnectionListeners(conn); }); peer.on('error', (err) => { console.error('PeerJS error:', err); updateP2PStatus('disconnected'); }); };
-    const setupConnectionListeners = (conn) => { conn.on('open', () => { console.log('Connection established with ' + conn.peer); state.p2p.isConnected = true; updateP2PStatus('connected'); closeModal(); broadcastState(); }); conn.on('data', (data) => { if (data.type === 'state-update') { if (data.payload.lastUpdated > state.lastUpdated || state.lastUpdated === null) { console.log(`Accepting newer state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); state.ui.isReceivingP2PUpdate = true; state.lastUpdated = data.payload.lastUpdated; state.masterSubjects = data.payload.masterSubjects; state.settings = data.payload.settings; state.studyData = data.payload.studyData; Object.values(state.studyData).forEach(day => { day.forEach(item => { if (item.startTime) item.startTime = new Date(item.startTime); }); }); saveState(); render(); setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50); } else { console.log(`Ignoring stale state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); } } }); conn.on('close', () => { console.log('Connection closed.'); state.p2p.isConnected = false; state.p2p.connection = null; updateP2PStatus('disconnected'); }); };
+    const setupConnectionListeners = (conn) => { conn.on('open', () => { console.log('Connection established with ' + conn.peer); state.p2p.isConnected = true; updateP2PStatus('connected'); closeModal(); broadcastState(); }); conn.on('data', (data) => { if (data.type === 'state-update') { if (data.payload.lastUpdated > state.lastUpdated || state.lastUpdated === null) { console.log(`Accepting newer state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); state.ui.isReceivingP2PUpdate = true; state.lastUpdated = data.payload.lastUpdated; state.masterSubjects = data.payload.masterSubjects; state.settings = data.payload.settings; state.studyData = data.payload.studyData; Object.values(state.studyData).forEach(day => { day.forEach(item => { if (item.startTime) item.startTime = new Date(item.startTime); if (item.finishedAt) item.finishedAt = new Date(item.finishedAt); }); }); saveState(); render(); setTimeout(() => { state.ui.isReceivingP2PUpdate = false; }, 50); } else { console.log(`Ignoring stale state from peer. My time: ${state.lastUpdated}, Peer time: ${data.payload.lastUpdated}`); } } }); conn.on('close', () => { console.log('Connection closed.'); state.p2p.isConnected = false; state.p2p.connection = null; updateP2PStatus('disconnected'); }); };
     const broadcastState = () => { if (!state.p2p.connection || !state.p2p.isConnected || state.ui.isReceivingP2PUpdate) { return; } const payload = { lastUpdated: state.lastUpdated, masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, }; state.p2p.connection.send({ type: 'state-update', payload }); };
     const enhancedSaveState = () => { state.lastUpdated = Date.now(); saveState(); broadcastState(); }
     const saveState = () => { const stateToSave = { ...state }; delete stateToSave.p2p; localStorage.setItem('studyPlannerState', JSON.stringify(stateToSave)); };
