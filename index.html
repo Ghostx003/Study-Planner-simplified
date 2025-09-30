@@ -97,6 +97,11 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
         }
+        .subtask-input-wrapper { position: relative; display: flex; align-items: center; gap: 0.5rem; }
+        .subtask-input-clear { position: absolute; right: 0; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: none; padding: 0 0.5rem; }
+        .subtask-input-wrapper input:not(:placeholder-shown) + .subtask-input-clear { display: block; }
+        .next-status-indicator { visibility: hidden; }
+        .subtask-input-wrapper:focus-within .next-status-indicator { visibility: visible; }
     </style>
 </head>
 
@@ -130,15 +135,15 @@
                     </div>
                     
                     <div class="flex items-center border-l border-secondary pl-3 ml-1 space-x-2">
-                         <button data-action="startScanToSync" title="Scan QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors sm:hidden text-subtle">
-                             <i class="fas fa-camera"></i>
-                         </button>
-                         <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
-                             <i class="fas fa-qrcode"></i>
-                         </button>
-                         <div id="p2p-status" class="hidden">
-                             <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
-                         </div>
+                          <button data-action="startScanToSync" title="Scan QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors sm:hidden text-subtle">
+                               <i class="fas fa-camera"></i>
+                          </button>
+                          <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
+                               <i class="fas fa-qrcode"></i>
+                          </button>
+                          <div id="p2p-status" class="hidden">
+                               <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
+                          </div>
                     </div>
 
                     <button data-action="openModal" data-modal="generate-schedule-modal" class="btn btn-primary text-sm sm:hidden ml-auto">
@@ -203,7 +208,7 @@
                     <div id="custom-legend" class="space-y-3"></div>
                 </div>
             </div>
-             <button data-action="exportSummary" class="btn btn-secondary w-full !mt-6">Export Summary to Clipboard</button>
+               <button data-action="exportSummary" class="btn btn-secondary w-full !mt-6">Export Summary to Clipboard</button>
         </div>
     </main>
     
@@ -215,7 +220,7 @@
     <div id="generate-schedule-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]"><div class="p-6 pb-4 flex-shrink-0"><h4 class="text-xl font-bold text-main">Generate a New Schedule</h4></div><div class="px-6 space-y-6 overflow-y-auto flex-grow"><div><h5 class="text-sm font-bold text-subtle mb-2">1. When do you want to start?</h5><div id="start-time-selection" class="option-grid"></div></div><div><h5 class="text-sm font-bold text-subtle mb-2">2. What's the default duration? (Hours)</h5><div id="default-duration-selection" class="option-grid"></div></div><div><h5 class="text-sm font-bold text-subtle mb-2">3. How many subjects?</h5><div id="subject-count-selection" class="option-grid"></div></div></div><div class="flex justify-end space-x-3 p-6 pt-4 mt-auto flex-shrink-0 border-t border-secondary"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmGenerateSchedule" id="confirm-generate-btn" class="btn btn-primary" disabled>Create Schedule</button></div></div></div>
     <div id="export-import-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-lg"><h4 class="text-xl font-bold mb-4 text-main">Export / Import Data</h4><div class="space-y-6"><div><h5 class="font-semibold text-main mb-2">Export</h5><p class="text-sm text-subtle mb-3">Click the button to copy your current schedule and settings data to the clipboard.</p><button data-action="exportData" class="btn btn-secondary w-full">Copy Data to Clipboard</button></div><hr class="border-secondary"><div><h5 class="font-semibold text-main mb-2">Import</h5><p class="text-sm text-subtle mb-3">Paste the exported data into the box below and click "Import" to load it. This will overwrite your current data.</p><textarea id="import-data-textarea" rows="5" class="w-full p-2 input-main" placeholder="Paste your exported data here..."></textarea><button data-action="importData" class="btn btn-primary w-full mt-3">Import Data</button></div></div><div class="flex justify-end mt-6"><button data-action="closeModal" class="btn btn-secondary">Close</button></div></div></div>
     <div id="session-end-time-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 class="text-xl font-bold mb-4 text-main">Session End Time</h4><input type="time" id="session-end-time-input" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEndTime" class="btn btn-primary">Set</button></div></div></div>
-    <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 id="edit-hours-title" class="text-xl font-bold mb-2 text-main">Set Duration</h4><p id="edit-hours-subject-name" class="text-md mb-4 text-subtle"></p><input type="number" id="hours-input" min="0.25" step="0.25" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEditHours" class="btn btn-primary">Save</button></div></div></div>
+    <div id="edit-hours-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50 p-4"><div class="bg-main rounded-2xl shadow-xl p-6 w-full max-w-xs"><h4 id="edit-hours-title" class="text-xl font-bold mb-2 text-main">Set Duration</h4><p id="edit-hours-subject-name" class="text-md mb-4 text-subtle"></p><input type="number" id="hours-input" min="0.25" step="0.25" class="w-full p-2 border rounded-lg mb-4 text-center text-lg input-main"><div class="flex justify-end space-x-3"><button data-action="closeModal" class="btn btn-secondary">Cancel</button><button data-action="confirmEditHours" id="confirm-edit-hours-btn" class="btn btn-primary">Save</button></div></div></div>
     
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -231,7 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
             draggedItemId: null, 
             isReceivingP2PUpdate: false,
             swapState: { active: false, subjectToSwap: null },
-            currentView: 'schedule' 
+            currentView: 'schedule',
+            // NEW: State for tracking next subtask status
+            nextSubtaskStatus: {},
         },
         scheduleParams: { startTime: null, subjectCount: null, defaultDuration: null },
         p2p: { peer: null, connection: null, isConnected: false, scanner: null }
@@ -275,22 +282,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const playAlarmSound = () => {
         if (synth) {
             const now = Tone.now();
-            synth.triggerAttackRelease("C5", "8n", now);
-            synth.triggerAttackRelease("G5", "8n", now + 0.2);
+            synth.triggerAttackRelease("G5", "16n", now);
+            synth.triggerAttackRelease("G5", "16n", now + 0.15);
+            synth.triggerAttackRelease("G5", "16n", now + 0.3);
         }
     };
 
-    const triggerNotification = (currentItemId, currentSubjectName, nextSubjectName) => {
+    const triggerNotification = (currentItemId, title, body) => {
         playAlarmSound();
         if (Notification.permission === 'granted') {
-            const notif = new Notification("Time's Up!", {
-                body: `Stop studying ${currentSubjectName} and start ${nextSubjectName}.`,
+            const notif = new Notification(title, {
+                body: body,
                 icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>',
-                tag: `study-planner-${currentItemId}` // Use a tag to prevent multiple notifications for the same event
+                tag: `study-planner-${currentItemId}`
             });
-
             notif.onclick = () => {
-                // When notification is clicked, focus the window and complete the task.
                 window.focus();
                 completeTaskById(currentItemId);
                 notif.close();
@@ -303,30 +309,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = formatDateKey(now);
         const schedule = state.studyData[key] || [];
         if (schedule.length === 0) return;
-
         for (let i = 0; i < schedule.length; i++) {
             const item = schedule[i];
             if (item.completed || item.notified || !item.startTime) continue;
-            
             const startTime = new Date(item.startTime);
             const endTime = calculateEndTime(startTime, item.durationHours);
             const timeDiff = endTime.getTime() - now.getTime();
-
-            // Trigger within the last 2.5 seconds to ensure it fires reliably
             if (timeDiff > 0 && timeDiff <= 2500) {
                 item.notified = true;
-
                 const currentTaskName = item.name || item.text;
-                let nextTaskName = "your next task";
-
+                let isLastTask = true;
+                let nextTaskName = "";
                 for (let j = i + 1; j < schedule.length; j++) {
                     if (!schedule[j].completed) {
+                        isLastTask = false;
                         nextTaskName = schedule[j].name || schedule[j].text;
                         break;
                     }
                 }
-                
-                triggerNotification(item.id, currentTaskName, nextTaskName);
+                let title, body;
+                if (isLastTask) {
+                    title = "Schedule Complete!";
+                    body = "You have finished all your tasks! You are awesome, have a nice day! 😊✅";
+                } else {
+                    title = "Time's Up!";
+                    body = `Stop studying ${currentTaskName} and start ${nextTaskName}.`;
+                }
+                triggerNotification(item.id, title, body);
                 break;
             }
         }
@@ -341,7 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = formatDateKey(new Date());
         const schedule = state.studyData[key] || [];
         const item = schedule.find(s => s.id == itemId);
-
         if (item && !item.completed) {
             item.completed = true;
             const completionTime = new Date();
@@ -352,17 +360,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const actualDurationHours = Math.max(actualDurationMs / (1000 * 60 * 60), 1 / 60);
             item.durationHours = actualDurationHours;
             item.finishedAt = completionTime.toISOString();
-
             if (item.type === 'subject') {
                 distributeSubTaskHours(item);
                 if (item.subTasks) {
                     item.subTasks.forEach(t => t.completed = true);
                 }
             }
-
             const itemIndex = schedule.findIndex(i => i.id === item.id);
             recalculateStartTimes(itemIndex + 1);
-            
             render();
             enhancedSaveState();
         }
@@ -431,28 +436,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return `<div class="bg-tertiary rounded-xl overflow-hidden border border-secondary shadow-sm" draggable="true" data-item-id="${subject.id}"><div class="flex items-center p-3 sm:p-4 gap-2 sm:gap-3"><span class="drag-handle text-subtle" title="Drag to reorder">${createDragIcon()}</span><div data-action="toggleMainCompletion" data-item-id="${subject.id}" class="custom-checkbox w-7 h-7 rounded-md cursor-pointer flex-shrink-0 ${subject.completed ? 'completed' : ''}"></div><div class="flex-grow min-w-0"><div class="flex items-center gap-3"><label class="subject-label font-bold text-main text-xl ${subject.completed ? 'completed' : ''} truncate">${subject.name}</label></div>${timeDisplayHTML}</div><div data-action="openModal" data-modal="edit-hours-modal" data-item-id="${subject.id}" class="relative cursor-pointer w-12 h-12 sm:w-14 sm:h-14" title="Edit time for ${subject.name}">${createProgressCircle(progress, formatHoursAndMinutesCompact(displayDuration))}</div><button data-action="toggleSubTaskPanel" data-item-id="${subject.id}" class="p-1 rounded-full hover:bg-border-primary transition-colors"><svg class="w-5 h-5 sm:w-6 sm:h-6 text-subtle transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button></div><div class="subtask-container px-4 pb-4 border-t border-secondary ${isPanelOpen ? '' : 'hidden'}">${isPanelOpen ? createSubTasksHTML(subject) : ''}</div></div>`;
     };
-    const createSubTasksHTML = (subject) => { let html = '<div class="space-y-3 pt-3">'; subject.subTasks.forEach((task, index) => { html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-item-id="${subject.id}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-item-id="${subject.id}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-item-id="${subject.id}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`; }); html += `</div> <div class="flex items-center justify-between mt-4 gap-2"> <input type="text" placeholder="Add task & press Enter" data-action-on-enter="addSubTaskOnEnter" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary flex-grow"> <div class="flex-shrink-0 flex items-center gap-2"> <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs"> <i class="fas fa-copy mr-1"></i> Duplicate </button> <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);"> <i class="fas fa-trash-alt mr-1"></i> Delete </button> </div> </div>`; return html; };
+    
+    // MODIFIED FUNCTION: createSubTasksHTML
+    const createSubTasksHTML = (subject) => {
+        let html = '<div class="space-y-3 pt-3">';
+        subject.subTasks.forEach((task, index) => {
+            html += `<div class="flex items-center gap-2"><div data-action="toggleSubTaskCompletion" data-item-id="${subject.id}" data-task-index="${index}" class="custom-checkbox w-4 h-4 rounded-sm cursor-pointer shrink-0 ${task.completed?'completed':''}"></div><span class="subtask-label flex-grow text-sm text-main ${task.completed?'completed':''} min-w-0 break-words">${task.text}</span><span class="text-xs font-medium text-subtle bg-main px-2 py-0.5 rounded-md whitespace-nowrap">${formatHoursAndMinutes(task.hours)}</span><button data-action="cycleSubTaskStatus" data-item-id="${subject.id}" data-task-index="${index}" class="status-btn status-${(task.status||'none').toLowerCase()}">${task.status||'None'}</button><button data-action="deleteSubTask" data-item-id="${subject.id}" data-task-index="${index}" class="text-subtle font-bold text-lg px-2 rounded-full hover:bg-red-500/20 hover:text-red-500">&times;</button></div>`;
+        });
+
+        // NEW: Enhanced input area with status indicator and clear button
+        const nextStatus = state.ui.nextSubtaskStatus[subject.id] || 'None';
+        html += `</div> 
+        <div class="flex items-center justify-between mt-4 gap-2">
+            <div class="subtask-input-wrapper flex-grow">
+                <span class="next-status-indicator status-btn status-${nextStatus.toLowerCase()}">${nextStatus}</span>
+                <input type="text" placeholder="Add task (Tab to change status)" data-action-type="subtask-input" data-item-id="${subject.id}" class="bg-transparent w-full focus:outline-none text-sm text-main placeholder-text-secondary">
+                <button class="subtask-input-clear" data-action="clearSubtaskInput" data-item-id="${subject.id}" title="Clear input">&times;</button>
+            </div>
+            <div class="flex-shrink-0 flex items-center gap-2">
+                <button data-action="duplicateSubject" data-item-id="${subject.id}" class="btn btn-secondary py-1 px-3 text-xs"> <i class="fas fa-copy mr-1"></i> Duplicate </button>
+                <button data-action="deleteItem" data-item-id="${subject.id}" class="btn py-1 px-3 text-xs text-on-accent" style="background-color: var(--accent-danger);"> <i class="fas fa-trash-alt mr-1"></i> Delete </button>
+            </div>
+        </div>`;
+        return html;
+    };
+    
     const renderProgress = () => {
         const key = formatDateKey(new Date()); 
         const items = (state.studyData[key] || []).filter(item => item.type === 'subject');
-        
-        const totalHours = items.reduce((s, c) => {
-            const plannedDuration = c.originalDuration !== undefined ? c.originalDuration : c.durationHours;
-            return s + plannedDuration;
-        }, 0);
-
+        const totalHours = items.reduce((s, c) => s + (c.originalDuration !== undefined ? c.originalDuration : c.durationHours), 0);
         const completedHours = items.reduce((s, c) => {
             const plannedDuration = c.originalDuration !== undefined ? c.originalDuration : c.durationHours;
-            if (c.completed) {
-                return s + plannedDuration;
-            }
+            if (c.completed) return s + plannedDuration;
             if (c.subTasks.length > 0) {
                 const hoursPerTask = plannedDuration / c.subTasks.length;
                 return s + (hoursPerTask * c.subTasks.filter(t => t.completed).length);
             }
             return s;
         }, 0);
-        
         const progress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0;
         DOM.progressSummary.innerHTML = `<span class="text-sm font-semibold whitespace-nowrap">${formatHoursAndMinutes(completedHours)} / ${formatHoursAndMinutes(totalHours)}</span> ${createSmallProgressCircle(progress)}`;
         renderMotivationMessage(totalHours - completedHours);
@@ -461,116 +482,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderCountdown = () => { if (countdownInterval) clearInterval(countdownInterval); if (!state.settings.sessionEndTime) { DOM.sessionCountdown.textContent = '--:--:--'; return; } const update = () => { const now = new Date(); const end = new Date(); const [h, m] = state.settings.sessionEndTime.split(':'); end.setHours(parseInt(h), parseInt(m), 0, 0); const diff = end.getTime() - now.getTime(); if (diff <= 0) { DOM.sessionCountdown.textContent = '00:00:00'; clearInterval(countdownInterval); return; } const hr = Math.floor(diff / 3600000).toString().padStart(2, '0'); const min = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0'); const sec = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0'); DOM.sessionCountdown.textContent = `${hr}:${min}:${sec}`; }; update(); countdownInterval = setInterval(update, 1000); };
     const renderMotivationMessage = (remHours) => { if (!state.settings.sessionEndTime) { DOM.sessionMotivation.innerHTML = 'Set an end time to begin.'; return; } if (remHours <= 0) { DOM.sessionMotivation.innerHTML = "All tasks done! You're amazing! 🚀"; return; } const now = new Date(); const end = new Date(); const [h, m] = state.settings.sessionEndTime.split(':'); end.setHours(parseInt(h), parseInt(m), 0, 0); const diffMs = end.getTime() - now.getTime(); let msg = `You have <strong>${formatHoursAndMinutes(remHours)}</strong> of tasks left.`; if (diffMs > 0) { const sessionMinsLeft = diffMs / 60000; msg += ` Session ends in <strong>${formatHoursAndMinutes(sessionMinsLeft / 60)}</strong>.`; if (remHours * 60 > sessionMinsLeft) { msg += ` <span style="color: var(--accent-danger);">Time to focus!</span>`; } else { msg += ` <span style="color: var(--accent-primary);">You're on track!</span>`; } } else { msg += ` Session has ended. Great work!`; } DOM.sessionMotivation.innerHTML = msg; };
 
-    // --- Summary View Logic ---
-    const setupSummaryView = () => {
-        DOM.summaryFilter.onchange = (e) => renderSummaryChart(e.target.value);
-        renderSummaryChart(DOM.summaryFilter.value);
-    };
-    const calculateSummaryData = (filter = 'overall') => {
-        const summary = {};
-        Object.values(state.studyData).forEach(day => {
-            day.forEach(item => {
-                if (item.type !== 'subject' || !item.completed) return;
-                const durationForCalc = item.originalDuration !== undefined ? item.originalDuration : item.durationHours;
-                if (filter === 'overall') {
-                    summary[item.name] = (summary[item.name] || 0) + durationForCalc;
-                } else {
-                    if (!item.subTasks || item.subTasks.length === 0) return;
-                    const hoursPerTask = durationForCalc / item.subTasks.length;
-                    item.subTasks.forEach(task => {
-                        if (task.status === filter) {
-                            summary[item.name] = (summary[item.name] || 0) + hoursPerTask;
-                        }
-                    });
-                }
-            });
-        });
-        const labels = Object.keys(summary);
-        const data = Object.values(summary);
-        return { labels, data };
-    };
-    const generateVibrantColors = (count) => {
-        const colors = [];
-        const hueStep = 360 / count;
-        for (let i = 0; i < count; i++) {
-            const hue = i * hueStep;
-            colors.push(`hsl(${hue}, 85%, 60%)`);
-        }
-        return colors;
-    };
-    const renderSummaryChart = (filter) => {
-        if (summaryChartInstance) {
-            summaryChartInstance.destroy();
-        }
-        const { labels, data } = calculateSummaryData(filter);
-        const colors = generateVibrantColors(labels.length);
-        const totalHours = data.reduce((sum, value) => sum + value, 0);
-
-        DOM.customLegend.innerHTML = ''; 
-        
-        if (labels.length === 0) {
-            DOM.chartCenterText.innerHTML = `<div class="text-subtle">No Data</div>`;
-            DOM.customLegend.innerHTML = `<p class="text-subtle text-center w-full">No completed data found for the "${filter}" category.</p>`;
-            if(document.getElementById('summary-chart')) document.getElementById('summary-chart').style.display = 'none';
-            return;
-        }
-        if(document.getElementById('summary-chart')) document.getElementById('summary-chart').style.display = 'block';
-
-        DOM.chartCenterText.innerHTML = `<div class="font-bold text-3xl text-main">${formatHoursAndMinutesCompact(totalHours)}</div><div class="text-sm text-subtle">Total</div>`;
-
-        const sortedData = labels.map((label, index) => ({
-            label, 
-            value: data[index],
-            color: colors[index]
-        })).sort((a,b) => b.value - a.value);
-
-        sortedData.forEach(item => {
-            DOM.customLegend.innerHTML += `
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <span class="w-3 h-3 rounded-full" style="background-color: ${item.color}"></span>
-                        <span class="font-semibold text-main">${item.label}</span>
-                    </div>
-                    <span class="font-medium text-subtle">${formatHoursAndMinutesCompact(item.value)}</span>
-                </div>
-            `;
-        });
-
-        const ctx = document.getElementById('summary-chart').getContext('2d');
-        summaryChartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: data,
-                    backgroundColor: colors,
-                    borderColor: getComputedStyle(document.body).getPropertyValue('--bg-tertiary'),
-                    borderWidth: 4,
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                cutout: '75%',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) { label += ': '; }
-                                if (context.parsed !== null) {
-                                    label += formatHoursAndMinutes(context.parsed);
-                                }
-                                return label;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    };
+    // --- Summary View Logic (unchanged) ---
+    const setupSummaryView = () => { DOM.summaryFilter.onchange = (e) => renderSummaryChart(e.target.value); renderSummaryChart(DOM.summaryFilter.value); };
+    const calculateSummaryData = (filter = 'overall') => { const summary = {}; Object.values(state.studyData).forEach(day => { day.forEach(item => { if (item.type !== 'subject' || !item.completed) return; const durationForCalc = item.originalDuration !== undefined ? item.originalDuration : item.durationHours; if (filter === 'overall') { summary[item.name] = (summary[item.name] || 0) + durationForCalc; } else { if (!item.subTasks || item.subTasks.length === 0) return; const hoursPerTask = durationForCalc / item.subTasks.length; item.subTasks.forEach(task => { if (task.status === filter) { summary[item.name] = (summary[item.name] || 0) + hoursPerTask; } }); } }); }); const labels = Object.keys(summary); const data = Object.values(summary); return { labels, data }; };
+    const generateVibrantColors = (count) => { const colors = []; const hueStep = 360 / count; for (let i = 0; i < count; i++) { const hue = i * hueStep; colors.push(`hsl(${hue}, 85%, 60%)`); } return colors; };
+    const renderSummaryChart = (filter) => { if (summaryChartInstance) { summaryChartInstance.destroy(); } const { labels, data } = calculateSummaryData(filter); const colors = generateVibrantColors(labels.length); const totalHours = data.reduce((sum, value) => sum + value, 0); DOM.customLegend.innerHTML = ''; if (labels.length === 0) { DOM.chartCenterText.innerHTML = `<div class="text-subtle">No Data</div>`; DOM.customLegend.innerHTML = `<p class="text-subtle text-center w-full">No completed data found for the "${filter}" category.</p>`; if(document.getElementById('summary-chart')) document.getElementById('summary-chart').style.display = 'none'; return; } if(document.getElementById('summary-chart')) document.getElementById('summary-chart').style.display = 'block'; DOM.chartCenterText.innerHTML = `<div class="font-bold text-3xl text-main">${formatHoursAndMinutesCompact(totalHours)}</div><div class="text-sm text-subtle">Total</div>`; const sortedData = labels.map((label, index) => ({ label, value: data[index], color: colors[index] })).sort((a,b) => b.value - a.value); sortedData.forEach(item => { DOM.customLegend.innerHTML += `<div class="flex justify-between items-center"><div class="flex items-center gap-3"><span class="w-3 h-3 rounded-full" style="background-color: ${item.color}"></span><span class="font-semibold text-main">${item.label}</span></div><span class="font-medium text-subtle">${formatHoursAndMinutesCompact(item.value)}</span></div>`; }); const ctx = document.getElementById('summary-chart').getContext('2d'); summaryChartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderColor: getComputedStyle(document.body).getPropertyValue('--bg-tertiary'), borderWidth: 4, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '75%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { let label = context.label || ''; if (label) { label += ': '; } if (context.parsed !== null) { label += formatHoursAndMinutes(context.parsed); } return label; } } } } } }); };
     
     // --- Modals and Actions ---
     const openModal = (id, payload = null) => { const modal = document.getElementById(id); if (!modal) return; if (id === 'manage-subjects-modal') setupManageSubjectsModal(); if (id === 'edit-subjects-modal') setupEditSubjectsModal(); if (id === 'generate-schedule-modal') setupGenerateScheduleModal(); if (id === 'session-end-time-modal') setupEndTimeModal(); if (id === 'theme-modal') setupThemeModal(); if (id === 'edit-hours-modal') setupEditHoursModal(payload); state.ui.currentModal = modal; modal.classList.remove('hidden'); };
@@ -580,7 +496,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleEditModalDblClick = (e) => { const targetDiv = e.target.closest('[data-subject-name]'); if (!targetDiv) return; const subjectName = targetDiv.dataset.subjectName; const isCurrent = targetDiv.dataset.isCurrent === 'true'; DOM.subjectsChecklist.querySelectorAll('.swap-active').forEach(el => el.classList.remove('swap-active')); if (isCurrent) { state.ui.swapState = { active: true, subjectToSwap: subjectName }; targetDiv.classList.add('swap-active'); } else { state.ui.swapState = { active: false, subjectToSwap: null }; } };
     const handleEditModalClick = (e) => { if (!state.ui.swapState.active) return; const targetDiv = e.target.closest('[data-subject-name]'); if (!targetDiv) { state.ui.swapState = { active: false, subjectToSwap: null }; DOM.subjectsChecklist.querySelector('.swap-active')?.classList.remove('swap-active'); return; } e.preventDefault(); const newSubjectName = targetDiv.dataset.subjectName; const isCurrent = targetDiv.dataset.isCurrent === 'true'; if (!isCurrent) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; schedule.forEach(item => { if (item.type === 'subject' && item.name === state.ui.swapState.subjectToSwap) { item.name = newSubjectName; } }); state.ui.swapState = { active: false, subjectToSwap: null }; closeModal(); render(); enhancedSaveState(); } else { state.ui.swapState = { active: false, subjectToSwap: null }; targetDiv.classList.remove('swap-active'); } };
     const setupEndTimeModal = () => DOM.sessionEndTimeInput.value = state.settings.sessionEndTime;
-    const setupEditHoursModal = (itemId) => { const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if(item) { DOM.hoursInput.dataset.itemId = item.id; if (item.type === 'subject') { DOM.editHoursTitle.textContent = "Set Duration (Hours)"; DOM.editHoursSubjectName.textContent = item.name; DOM.editHoursSubjectName.style.display = 'block'; DOM.hoursInput.value = item.durationHours; item.originalDuration = item.durationHours; DOM.hoursInput.min = "0.25"; DOM.hoursInput.step = "0.25"; } else if (item.type === 'break') { DOM.editHoursTitle.textContent = "Set Break Duration (Mins)"; DOM.editHoursSubjectName.style.display = 'none'; DOM.hoursInput.value = item.durationHours * 60; item.originalDuration = item.durationHours; DOM.hoursInput.min = "5"; DOM.hoursInput.step = "5"; } } };
+    
+    // MODIFIED FUNCTION: setupEditHoursModal
+    const setupEditHoursModal = (itemId) => {
+        const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId);
+        if(!item) return;
+
+        const hoursInput = DOM.hoursInput;
+        hoursInput.dataset.itemId = item.id;
+        if (item.type === 'subject') {
+            DOM.editHoursTitle.textContent = "Set Duration (Hours)";
+            DOM.editHoursSubjectName.textContent = item.name;
+            DOM.editHoursSubjectName.style.display = 'block';
+            hoursInput.value = item.durationHours;
+            hoursInput.min = "0.25";
+            hoursInput.step = "0.25";
+        } else if (item.type === 'break') {
+            DOM.editHoursTitle.textContent = "Set Break Duration (Mins)";
+            DOM.editHoursSubjectName.style.display = 'none';
+            hoursInput.value = item.durationHours * 60;
+            hoursInput.min = "5";
+            hoursInput.step = "5";
+        }
+        
+        // This is the more reliable fix for the Enter key.
+        // Instead of simulating a click, it calls the save action directly.
+        const enterHandler = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                actions.confirmEditHours(); // Call the action function directly
+                hoursInput.removeEventListener('keydown', enterHandler);
+            }
+        };
+        // Ensure no old listeners are attached before adding a new one.
+        hoursInput.removeEventListener('keydown', enterHandler);
+        hoursInput.addEventListener('keydown', enterHandler);
+    };
+    
     const setupThemeModal = () => { const a = [ { n: 'green', c: '#22c55e' }, { n: 'blue', c: '#3b82f6' }, { n: 'purple', c: '#a855f7' }, { n: 'red', c: '#ef4444' } ]; DOM.themeOptions.innerHTML = `<div><h5 class="text-sm font-bold text-subtle mb-3">Theme</h5><div class="grid grid-cols-2 gap-4"><button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme==='light'?'border-2 border-main':''}" style="${state.settings.theme==='light'?'border-color: var(--accent-primary)':''}">Light</button><button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme==='dark'?'border-2 border-main':''}" style="${state.settings.theme==='dark'?'border-color: var(--accent-primary)':''}">Dark</button></div></div><div><h5 class="text-sm font-bold text-subtle mb-3">Accent</h5><div class="flex items-center justify-around gap-4">${a.map(x=>`<button data-action="setAccent" data-accent="${x.n}" class="w-12 h-12 rounded-full ${state.settings.accent===x.n?'ring-2 ring-offset-2 ring-offset-bg-main':''}" style="background-color:${x.c}; ${state.settings.accent===x.n?'border-color: var(--accent-primary)':''}"></button>`).join('')}</div></div>`; };
     const setupGenerateScheduleModal = () => { state.scheduleParams = { startTime: null, subjectCount: null, defaultDuration: null }; const createOptionItems = (container, options, dataAttr, settingKey) => { container.innerHTML = options.map(opt => `<div class="option-item" data-action="handleOptionSelection" data-${dataAttr}="${opt.value}" data-setting-key="${settingKey}">${opt.label}</div>`).join(''); }; const timeOptions = []; for (let i = 6; i <= 21; i++) { timeOptions.push({ label: `${i <= 12 ? i : i - 12}:00 ${i < 12 ? 'AM' : 'PM'}`, value: `${i}:00` }); } createOptionItems(DOM.startTimeSelection, timeOptions, 'time', 'startTime'); createOptionItems(DOM.defaultDurationSelection, [0.5, 1, 1.5, 2, 2.5, 3, 3.5 , 4 , 5].map(h => ({ label: `${h} hr`, value: h })), 'duration', 'defaultDuration'); createOptionItems(DOM.subjectCountSelection, Array.from({ length: state.masterSubjects.length }, (_, i) => ({ label: i + 1, value: i + 1 })), 'count', 'subjectCount'); DOM.confirmGenerateBtn.disabled = true; };
 
@@ -597,41 +549,55 @@ document.addEventListener('DOMContentLoaded', () => {
         setAccent: (el) => { state.settings.accent = el.dataset.accent; setupThemeModal(); render(); enhancedSaveState(); },
         addMasterSubject: (el) => { const name = DOM.newSubjectInput.value.trim(); if (name && !state.masterSubjects.find(s => s.toLowerCase() === name.toLowerCase())) { state.masterSubjects.push(name); DOM.newSubjectInput.value = ''; setupManageSubjectsModal(); enhancedSaveState(); } },
         deleteMasterSubject: (el) => { state.masterSubjects = state.masterSubjects.filter(s => s !== el.dataset.subjectName); setupManageSubjectsModal(); enhancedSaveState(); },
-        editStartTime: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item) return; const container = el.parentElement; const input = document.createElement('input'); input.type = 'time'; input.className = 'input-main text-sm p-0.5 w-24 rounded-md'; input.value = formatTimeTo24hr(item.startTime); container.replaceChild(input, el); input.focus(); const saveTime = () => { const [newHour, newMinute] = input.value.split(':'); if (newHour && newMinute) { item.startTime.setHours(parseInt(newHour), parseInt(newMinute)); const schedule = state.studyData[formatDateKey(new Date())]; const itemIndex = schedule.findIndex(i => i.id == itemId); recalculateStartTimes(itemIndex + 1); enhancedSaveState(); } render(); }; input.addEventListener('blur', saveTime); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.removeEventListener('blur', saveTime); render(); } }); },
+        editStartTime: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item) return; const container = el.parentElement; const originalTime = formatTimeTo24hr(item.startTime); const input = document.createElement('input'); input.type = 'time'; input.className = 'input-main text-sm p-0.5 w-24 rounded-md'; input.value = originalTime; container.replaceChild(input, el); input.focus(); const saveAndRender = () => { if (input.value && input.value !== originalTime) { const [newHour, newMinute] = input.value.split(':'); if (newHour && newMinute) { item.startTime.setHours(parseInt(newHour), parseInt(newMinute)); const schedule = state.studyData[formatDateKey(new Date())]; const itemIndex = schedule.findIndex(i => i.id == itemId); recalculateStartTimes(itemIndex + 1); enhancedSaveState(); } } render(); }; input.addEventListener('blur', saveAndRender, { once: true }); input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { input.blur(); } if (e.key === 'Escape') { input.removeEventListener('blur', saveAndRender); render(); } }); },
         editBreakText: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item || item.type !== 'break') return; const container = el.parentElement; const input = document.createElement('input'); input.type = 'text'; input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow'; input.value = item.text || 'Break'; container.replaceChild(input, el); input.focus(); input.select(); const saveAndExit = () => { const newText = input.value.trim(); item.text = newText || 'Break'; enhancedSaveState(); render(); }; input.addEventListener('blur', saveAndExit); input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.removeEventListener('blur', saveAndExit); render(); } }); },
         confirmEditSubjects: () => { const key = formatDateKey(new Date()); const originalSchedule = state.studyData[key] || []; if (originalSchedule.length === 0) { closeModal(); return; } const sessionStartTime = originalSchedule[0].startTime; const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value); const originalSubjectItems = originalSchedule.filter(i => i.type === 'subject'); const originalCounts = originalSubjectItems.reduce((acc, subject) => { acc[subject.name] = (acc[subject.name] || 0) + 1; return acc; }, {}); const originalNames = Object.keys(originalCounts); const deselectedNames = originalNames.filter(name => !selectedNames.includes(name)); const newlySelectedNames = selectedNames.filter(name => !originalNames.includes(name)); let newSubjectDuplicationCount = 1; if (deselectedNames.length > 0) { const maxCount = Math.max(...deselectedNames.map(name => originalCounts[name])); if (maxCount > 1) { newSubjectDuplicationCount = maxCount; } } let newSchedule = originalSchedule.filter(item => item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))); newlySelectedNames.forEach(name => { for (let i = 0; i < newSubjectDuplicationCount; i++) { newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: state.settings.defaultDuration || 1, completed: false, subTasks: [], startTime: null }); } }); if (newSchedule.length > 0) { newSchedule[0].startTime = sessionStartTime; } state.studyData[key] = newSchedule; recalculateStartTimes(1); closeModal(); render(); enhancedSaveState(); },
-        confirmEditHours: (el) => { const itemId = DOM.hoursInput.dataset.itemId; const value = parseFloat(DOM.hoursInput.value); if (itemId && !isNaN(value) && value >= 0) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == itemId); if (item) { if (item.type === 'break') { item.durationHours = value / 60; } else { item.durationHours = value; } if (item.type === 'subject') distributeSubTaskHours(item); const itemIndex = schedule.indexOf(item); recalculateStartTimes(itemIndex + 1); } closeModal(); render(); enhancedSaveState(); } else { DOM.hoursInput.classList.add('border-red-500'); setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500); } },
-        toggleMainCompletion: (el) => {
-            const itemId = el.dataset.itemId;
-            const key = formatDateKey(new Date());
-            const schedule = state.studyData[key] || [];
-            const item = schedule.find(s => s.id == itemId);
-            if (!item) return;
-
-            if (!item.completed) {
-                // Use the shared function to mark as complete
-                completeTaskById(itemId);
-            } else {
-                // Logic for un-completing the task
-                item.completed = false;
-                item.finishedAt = null;
-                if (item.originalDuration !== undefined) {
-                    item.durationHours = item.originalDuration;
+        confirmEditHours: () => {
+            const itemId = DOM.hoursInput.dataset.itemId;
+            const value = parseFloat(DOM.hoursInput.value);
+            if (itemId && !isNaN(value) && value >= 0) {
+                const key = formatDateKey(new Date());
+                const schedule = state.studyData[key] || [];
+                const item = schedule.find(s => s.id == itemId);
+                if (item) {
+                    if (item.type === 'break') item.durationHours = value / 60;
+                    else item.durationHours = value;
+                    if (item.type === 'subject') distributeSubTaskHours(item);
+                    const itemIndex = schedule.indexOf(item);
+                    recalculateStartTimes(itemIndex + 1);
                 }
-                if (item.type === 'subject') {
-                    distributeSubTaskHours(item);
-                    if (item.subTasks) {
-                        item.subTasks.forEach(t => t.completed = false);
-                    }
-                }
-                const itemIndex = schedule.findIndex(i => i.id === item.id);
-                recalculateStartTimes(itemIndex + 1);
+                closeModal();
                 render();
                 enhancedSaveState();
+            } else {
+                DOM.hoursInput.classList.add('border-red-500');
+                setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500);
             }
         },
+        toggleMainCompletion: (el) => { const itemId = el.dataset.itemId; const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == itemId); if (!item) return; if (!item.completed) { completeTaskById(itemId); } else { item.completed = false; item.finishedAt = null; if (item.originalDuration !== undefined) { item.durationHours = item.originalDuration; } if (item.type === 'subject') { distributeSubTaskHours(item); if (item.subTasks) { item.subTasks.forEach(t => t.completed = false); } } const itemIndex = schedule.findIndex(i => i.id === item.id); recalculateStartTimes(itemIndex + 1); render(); enhancedSaveState(); } },
         toggleSubTaskPanel: (el) => { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if(subject) { const id = subject.id; if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); else state.ui.openSubTaskPanels.add(id); renderSubjects(); enhancedSaveState(); } },
-        addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); enhancedSaveState(); } },
+        addSubTask: (el) => {
+            const text = el.value.trim();
+            const itemId = el.dataset.itemId;
+            const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId);
+            if (s && text) {
+                const nextStatus = state.ui.nextSubtaskStatus[itemId] || 'None';
+                s.subTasks.push({ text, completed: false, status: nextStatus, hours: 0 });
+                distributeSubTaskHours(s);
+                state.ui.nextSubtaskStatus[itemId] = 'None'; // Reset for next time
+                render();
+                enhancedSaveState();
+                const newSubtaskInput = document.querySelector(`div[data-item-id="${itemId}"] input[data-action-type="subtask-input"]`);
+                if (newSubtaskInput) newSubtaskInput.focus();
+            }
+        },
+        clearSubtaskInput: (el) => {
+            const input = el.previousElementSibling;
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        },
         toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); enhancedSaveState(); } },
         deleteSubTask: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s) { s.subTasks.splice(taskIndex, 1); distributeSubTaskHours(s); render(); enhancedSaveState(); } },
         cycleSubTaskStatus: (el) => { const { itemId, taskIndex } = el.dataset; const t = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId)?.subTasks[taskIndex]; if(t){ const cur = ACTIVITY_TYPES.indexOf(t.status || 'None'); t.status = ACTIVITY_TYPES[(cur + 1) % ACTIVITY_TYPES.length]; render(); enhancedSaveState(); } },
@@ -640,74 +606,47 @@ document.addEventListener('DOMContentLoaded', () => {
         resetApp: () => { if (confirm("Are you sure? This will delete all subjects and schedules.")) { localStorage.removeItem('studyPlannerState'); window.location.reload(); } },
         handleOptionSelection: (el) => { const { settingKey } = el.dataset; const value = el.dataset[Object.keys(el.dataset).find(k => k !== 'action' && k !== 'settingKey')]; const isNumeric = settingKey !== 'startTime'; state.scheduleParams[settingKey] = isNumeric ? parseFloat(value) : value; const container = el.parentElement; container.querySelectorAll('.option-item').forEach(child => child.classList.remove('selected')); el.classList.add('selected'); DOM.confirmGenerateBtn.disabled = !(state.scheduleParams.startTime && state.scheduleParams.subjectCount && state.scheduleParams.defaultDuration); },
         confirmGenerateSchedule: () => { const { startTime, subjectCount, defaultDuration } = state.scheduleParams; if (!startTime || !subjectCount || !defaultDuration) return; state.settings.defaultDuration = defaultDuration; const shuffled = [...state.masterSubjects].sort(() => 0.5 - Math.random()); const randomSubjects = shuffled.slice(0, subjectCount); const [hour, minute] = startTime.split(':'); const scheduleStartTime = new Date(); scheduleStartTime.setHours(parseInt(hour), parseInt(minute), 0, 0); const newSchedule = randomSubjects.map(name => ({ id: Date.now() + Math.random(), type: 'subject', name: name, durationHours: defaultDuration, completed: false, subTasks: [], startTime: null })); if(newSchedule.length > 0) newSchedule[0].startTime = scheduleStartTime; state.studyData[formatDateKey(new Date())] = newSchedule; recalculateStartTimes(1); closeModal(); render(); enhancedSaveState(); },
-        addBreak: () => {
-            const key = formatDateKey(new Date());
-            const schedule = state.studyData[key] || [];
-            if (schedule.length === 0) {
-                alert("Generate a schedule first!");
-                return;
-            }
-            let insertionIndex = schedule.findIndex(item => !item.completed);
-            if (insertionIndex === -1) {
-                insertionIndex = schedule.length;
-            }
-            const newBreak = { 
-                id: Date.now() + Math.random(), 
-                type: 'break', 
-                text: 'Break', 
-                durationHours: 15 / 60, 
-                completed: false, 
-                startTime: null 
-            };
-            if (insertionIndex > 0) {
-                const prevItem = schedule[insertionIndex - 1];
-                newBreak.startTime = calculateEndTime(prevItem.startTime, prevItem.durationHours);
-            } else {
-                newBreak.startTime = schedule[0].startTime;
-            }
-            schedule.splice(insertionIndex, 0, newBreak);
-            recalculateStartTimes(insertionIndex + 1);
-            render();
-            enhancedSaveState();
-        },
+        addBreak: () => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; if (schedule.length === 0) { alert("Generate a schedule first!"); return; } let insertionIndex = schedule.findIndex(item => !item.completed); if (insertionIndex === -1) { insertionIndex = schedule.length; } const newBreak = { id: Date.now() + Math.random(), type: 'break', text: 'Break', durationHours: 15 / 60, completed: false, startTime: null }; if (insertionIndex > 0) { const prevItem = schedule[insertionIndex - 1]; newBreak.startTime = calculateEndTime(prevItem.startTime, prevItem.durationHours); } else { newBreak.startTime = schedule[0].startTime; } schedule.splice(insertionIndex, 0, newBreak); recalculateStartTimes(insertionIndex + 1); render(); enhancedSaveState(); },
         deleteItem: (el) => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const itemIndex = schedule.findIndex(i => i.id == el.dataset.itemId); if (itemIndex > -1) { schedule.splice(itemIndex, 1); recalculateStartTimes(itemIndex); render(); enhancedSaveState(); } },
         exportData: (el) => { const dataToExport = { masterSubjects: state.masterSubjects, studyData: state.studyData, settings: state.settings, }; const jsonString = JSON.stringify(dataToExport); navigator.clipboard.writeText(jsonString).then(() => { const originalText = el.textContent; el.textContent = 'Copied!'; el.classList.add('btn-primary'); el.classList.remove('btn-secondary'); setTimeout(() => { el.textContent = originalText; el.classList.remove('btn-primary'); el.classList.add('btn-secondary'); }, 2000); }).catch(err => { alert('Failed to copy data.'); console.error('Export error:', err); }); },
         importData: () => { const jsonString = DOM.importDataTextarea.value.trim(); if (!jsonString) { alert('Please paste your data into the text box.'); return; } try { const importedData = JSON.parse(jsonString); if (!importedData.masterSubjects || !importedData.studyData || !importedData.settings) { throw new Error("Data format is incorrect."); } if (confirm('Are you sure you want to import this data? Your current schedule and settings will be overwritten.')) { const newState = { masterSubjects: importedData.masterSubjects, studyData: importedData.studyData, settings: importedData.settings, ui: { currentModal: null, openSubTaskPanels: [], draggedItemId: null } }; localStorage.setItem('studyPlannerState', JSON.stringify(newState)); alert('Data imported successfully! The app will now reload.'); window.location.reload(); } } catch (error) { alert('Failed to import data. Please check the format and try again.'); console.error('Import error:', error); } },
-        exportSummary: (el) => {
-            const filters = ['overall', 'Lecture', 'Revision', 'Practice', 'Test'];
-            let report = 'Study Summary\n==============\n\n';
-            filters.forEach(filter => {
-                const { labels, data } = calculateSummaryData(filter);
-                const title = filter.charAt(0).toUpperCase() + filter.slice(1);
-                report += `** ${title} Hours **\n`;
-                if (labels.length > 0) {
-                    labels.forEach((label, i) => {
-                        report += `- ${label}: ${formatHoursAndMinutes(data[i])}\n`;
-                    });
-                } else {
-                    report += `- No data\n`;
-                }
-                report += '\n';
-            });
-            navigator.clipboard.writeText(report).then(() => {
-                const originalText = el.textContent;
-                el.textContent = 'Copied!';
-                setTimeout(() => { el.textContent = originalText; }, 2000);
-            }).catch(err => { alert('Failed to copy summary.'); });
-        },
+        exportSummary: (el) => { const filters = ['overall', 'Lecture', 'Revision', 'Practice', 'Test']; let report = 'Study Summary\n==============\n\n'; filters.forEach(filter => { const { labels, data } = calculateSummaryData(filter); const title = filter.charAt(0).toUpperCase() + filter.slice(1); report += `** ${title} Hours **\n`; if (labels.length > 0) { labels.forEach((label, i) => { report += `- ${label}: ${formatHoursAndMinutes(data[i])}\n`; }); } else { report += `- No data\n`; } report += '\n'; }); navigator.clipboard.writeText(report).then(() => { const originalText = el.textContent; el.textContent = 'Copied!'; setTimeout(() => { el.textContent = originalText; }, 2000); }).catch(err => { alert('Failed to copy summary.'); }); },
     };
 
     document.body.addEventListener('click', (e) => {
         if (!audioInitialized && typeof Tone !== 'undefined') {
-            Tone.start().then(() => {
-                initializeAudio();
-                console.log('Audio context started!');
-            });
+            Tone.start().then(() => { initializeAudio(); console.log('Audio context started!'); });
         }
         const t = e.target.closest('[data-action]'); 
         if (t && actions[t.dataset.action]) actions[t.dataset.action](t); 
     });
-    document.body.addEventListener('keydown', (e) => { const t = e.target.closest('[data-action-on-enter]'); if (t && e.key === 'Enter' && actions[t.dataset.actionOnEnter]) { e.preventDefault(); actions[t.dataset.actionOnEnter](t, e); } });
+    
+    // MODIFIED: Enhanced keydown listener for Enter and Tab
+    document.body.addEventListener('keydown', (e) => {
+        const target = e.target;
+        if (target.dataset.actionType === 'subtask-input') {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                actions.addSubTask(target);
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const itemId = target.dataset.itemId;
+                const currentStatus = state.ui.nextSubtaskStatus[itemId] || 'None';
+                const currentIndex = ACTIVITY_TYPES.indexOf(currentStatus);
+                const nextIndex = (currentIndex + 1) % ACTIVITY_TYPES.length;
+                const nextStatus = ACTIVITY_TYPES[nextIndex];
+                state.ui.nextSubtaskStatus[itemId] = nextStatus;
+                
+                // Update UI without full re-render for speed
+                const indicator = target.parentElement.querySelector('.next-status-indicator');
+                if(indicator) {
+                    indicator.textContent = nextStatus;
+                    indicator.className = `next-status-indicator status-btn status-${nextStatus.toLowerCase()}`;
+                }
+            }
+        }
+    });
+
     document.body.addEventListener('dragstart', (e) => { const t = e.target.closest('[data-item-id]'); if (t) { state.ui.draggedItemId = t.dataset.itemId; e.dataTransfer.effectAllowed = 'move'; t.classList.add('dragging'); } });
     document.body.addEventListener('dragend', (e) => { const t = document.querySelector('.dragging'); if (t) t.classList.remove('dragging'); state.ui.draggedItemId = null; });
     document.body.addEventListener('dragover', (e) => { e.preventDefault(); const t = e.target.closest('[data-item-id]'); if (t && t.dataset.itemId !== state.ui.draggedItemId) { document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); t.classList.add('drag-over'); } });
@@ -719,11 +658,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const init = () => {
         loadState();
         render();
-        // Request notification permission on load if not already set
         if (typeof Notification !== 'undefined' && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
             Notification.requestPermission();
         }
-        setupNotificationTimer(); // Start the task ending checker
+        setupNotificationTimer();
     };
     
     init();
