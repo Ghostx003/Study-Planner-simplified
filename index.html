@@ -280,13 +280,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const triggerNotification = (currentSubjectName, nextSubjectName) => {
+    const triggerNotification = (currentItemId, currentSubjectName, nextSubjectName) => {
         playAlarmSound();
         if (Notification.permission === 'granted') {
-            new Notification("Time's Up!", {
+            const notif = new Notification("Time's Up!", {
                 body: `Stop studying ${currentSubjectName} and start ${nextSubjectName}.`,
-                icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>'
+                icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>',
+                tag: `study-planner-${currentItemId}` // Use a tag to prevent multiple notifications for the same event
             });
+
+            notif.onclick = () => {
+                // When notification is clicked, focus the window and complete the task.
+                window.focus();
+                completeTaskById(currentItemId);
+                notif.close();
+            };
         }
     };
 
@@ -298,22 +306,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (let i = 0; i < schedule.length; i++) {
             const item = schedule[i];
-            // Skip if completed, already notified, or has no start time
             if (item.completed || item.notified || !item.startTime) continue;
             
-            // Ensure startTime is a Date object
             const startTime = new Date(item.startTime);
             const endTime = calculateEndTime(startTime, item.durationHours);
             const timeDiff = endTime.getTime() - now.getTime();
 
-            // Trigger within the last 2 seconds before the task ends
-            if (timeDiff > 0 && timeDiff <= 2000) {
-                item.notified = true; // Mark to prevent repeated notifications
+            // Trigger within the last 2.5 seconds to ensure it fires reliably
+            if (timeDiff > 0 && timeDiff <= 2500) {
+                item.notified = true;
 
                 const currentTaskName = item.name || item.text;
                 let nextTaskName = "your next task";
 
-                // Find the next non-completed task to suggest
                 for (let j = i + 1; j < schedule.length; j++) {
                     if (!schedule[j].completed) {
                         nextTaskName = schedule[j].name || schedule[j].text;
@@ -321,15 +326,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
                 
-                triggerNotification(currentTaskName, nextTaskName);
-                break; // Only handle one notification per interval to avoid spam
+                triggerNotification(item.id, currentTaskName, nextTaskName);
+                break;
             }
         }
     };
 
     const setupNotificationTimer = () => {
         if (notificationInterval) clearInterval(notificationInterval);
-        notificationInterval = setInterval(checkTaskEndings, 1000); // Check every second
+        notificationInterval = setInterval(checkTaskEndings, 1000);
+    };
+
+    const completeTaskById = (itemId) => {
+        const key = formatDateKey(new Date());
+        const schedule = state.studyData[key] || [];
+        const item = schedule.find(s => s.id == itemId);
+
+        if (item && !item.completed) {
+            item.completed = true;
+            const completionTime = new Date();
+            if (item.originalDuration === undefined) {
+                item.originalDuration = item.durationHours;
+            }
+            const actualDurationMs = completionTime.getTime() - new Date(item.startTime).getTime();
+            const actualDurationHours = Math.max(actualDurationMs / (1000 * 60 * 60), 1 / 60);
+            item.durationHours = actualDurationHours;
+            item.finishedAt = completionTime.toISOString();
+
+            if (item.type === 'subject') {
+                distributeSubTaskHours(item);
+                if (item.subTasks) {
+                    item.subTasks.forEach(t => t.completed = true);
+                }
+            }
+
+            const itemIndex = schedule.findIndex(i => i.id === item.id);
+            recalculateStartTimes(itemIndex + 1);
+            
+            render();
+            enhancedSaveState();
+        }
     };
 
     // --- Core Utilities & State Management ---
@@ -565,7 +601,35 @@ document.addEventListener('DOMContentLoaded', () => {
         editBreakText: (el) => { const itemId = el.dataset.itemId; const item = state.studyData[formatDateKey(new Date())]?.find(i => i.id == itemId); if (!item || item.type !== 'break') return; const container = el.parentElement; const input = document.createElement('input'); input.type = 'text'; input.className = 'font-bold text-main bg-transparent border-b border-main focus:outline-none flex-grow'; input.value = item.text || 'Break'; container.replaceChild(input, el); input.focus(); input.select(); const saveAndExit = () => { const newText = input.value.trim(); item.text = newText || 'Break'; enhancedSaveState(); render(); }; input.addEventListener('blur', saveAndExit); input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.removeEventListener('blur', saveAndExit); render(); } }); },
         confirmEditSubjects: () => { const key = formatDateKey(new Date()); const originalSchedule = state.studyData[key] || []; if (originalSchedule.length === 0) { closeModal(); return; } const sessionStartTime = originalSchedule[0].startTime; const selectedNames = Array.from(DOM.subjectsChecklist.querySelectorAll('input:checked')).map(cb => cb.value); const originalSubjectItems = originalSchedule.filter(i => i.type === 'subject'); const originalCounts = originalSubjectItems.reduce((acc, subject) => { acc[subject.name] = (acc[subject.name] || 0) + 1; return acc; }, {}); const originalNames = Object.keys(originalCounts); const deselectedNames = originalNames.filter(name => !selectedNames.includes(name)); const newlySelectedNames = selectedNames.filter(name => !originalNames.includes(name)); let newSubjectDuplicationCount = 1; if (deselectedNames.length > 0) { const maxCount = Math.max(...deselectedNames.map(name => originalCounts[name])); if (maxCount > 1) { newSubjectDuplicationCount = maxCount; } } let newSchedule = originalSchedule.filter(item => item.type === 'break' || (item.type === 'subject' && selectedNames.includes(item.name))); newlySelectedNames.forEach(name => { for (let i = 0; i < newSubjectDuplicationCount; i++) { newSchedule.push({ id: Date.now() + Math.random(), type: 'subject', name, durationHours: state.settings.defaultDuration || 1, completed: false, subTasks: [], startTime: null }); } }); if (newSchedule.length > 0) { newSchedule[0].startTime = sessionStartTime; } state.studyData[key] = newSchedule; recalculateStartTimes(1); closeModal(); render(); enhancedSaveState(); },
         confirmEditHours: (el) => { const itemId = DOM.hoursInput.dataset.itemId; const value = parseFloat(DOM.hoursInput.value); if (itemId && !isNaN(value) && value >= 0) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == itemId); if (item) { if (item.type === 'break') { item.durationHours = value / 60; } else { item.durationHours = value; } if (item.type === 'subject') distributeSubTaskHours(item); const itemIndex = schedule.indexOf(item); recalculateStartTimes(itemIndex + 1); } closeModal(); render(); enhancedSaveState(); } else { DOM.hoursInput.classList.add('border-red-500'); setTimeout(() => DOM.hoursInput.classList.remove('border-red-500'), 1500); } },
-        toggleMainCompletion: (el) => { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; const item = schedule.find(s => s.id == el.dataset.itemId); if (item) { const wasCompleted = item.completed; item.completed = !item.completed; if (item.completed && !wasCompleted) { const completionTime = new Date(); if (item.originalDuration === undefined) { item.originalDuration = item.durationHours; } const actualDurationMs = completionTime.getTime() - item.startTime.getTime(); const actualDurationHours = Math.max(actualDurationMs / (1000 * 60 * 60), 1/60); item.durationHours = actualDurationHours; item.finishedAt = completionTime.toISOString(); if (item.type === 'subject') { distributeSubTaskHours(item); } const itemIndex = schedule.findIndex(i => i.id === item.id); recalculateStartTimes(itemIndex + 1); } else if (!item.completed && wasCompleted) { item.finishedAt = null; if (item.originalDuration !== undefined) { item.durationHours = item.originalDuration; } if (item.type === 'subject') { distributeSubTaskHours(item); } const itemIndex = schedule.findIndex(i => i.id === item.id); recalculateStartTimes(itemIndex + 1); } if (item.type === 'subject' && item.subTasks) { item.subTasks.forEach(t => t.completed = item.completed); } render(); enhancedSaveState(); } },
+        toggleMainCompletion: (el) => {
+            const itemId = el.dataset.itemId;
+            const key = formatDateKey(new Date());
+            const schedule = state.studyData[key] || [];
+            const item = schedule.find(s => s.id == itemId);
+            if (!item) return;
+
+            if (!item.completed) {
+                // Use the shared function to mark as complete
+                completeTaskById(itemId);
+            } else {
+                // Logic for un-completing the task
+                item.completed = false;
+                item.finishedAt = null;
+                if (item.originalDuration !== undefined) {
+                    item.durationHours = item.originalDuration;
+                }
+                if (item.type === 'subject') {
+                    distributeSubTaskHours(item);
+                    if (item.subTasks) {
+                        item.subTasks.forEach(t => t.completed = false);
+                    }
+                }
+                const itemIndex = schedule.findIndex(i => i.id === item.id);
+                recalculateStartTimes(itemIndex + 1);
+                render();
+                enhancedSaveState();
+            }
+        },
         toggleSubTaskPanel: (el) => { const subject = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if(subject) { const id = subject.id; if (state.ui.openSubTaskPanels.has(id)) state.ui.openSubTaskPanels.delete(id); else state.ui.openSubTaskPanels.add(id); renderSubjects(); enhancedSaveState(); } },
         addSubTaskOnEnter: (el) => { const text = el.value.trim(); const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == el.dataset.itemId); if (s && text) { s.subTasks.push({ text, completed: false, status: 'None', hours: 0 }); distributeSubTaskHours(s); el.value = ''; render(); enhancedSaveState(); } },
         toggleSubTaskCompletion: (el) => { const { itemId, taskIndex } = el.dataset; const s = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId); if (s && s.subTasks[taskIndex]) { s.subTasks[taskIndex].completed = !s.subTasks[taskIndex].completed; render(); enhancedSaveState(); } },
