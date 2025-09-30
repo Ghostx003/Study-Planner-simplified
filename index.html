@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <style>
         /* THEME & COLOR SYSTEM */
         :root {
@@ -237,6 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let summaryChartInstance = null;
+    let synth = null;
+    let audioInitialized = false;
+    let notificationInterval = null;
 
     const ACTIVITY_TYPES = ['None', 'Lecture', 'Revision', 'Practice', 'Test'];
     const DOM = {
@@ -257,6 +261,77 @@ document.addEventListener('DOMContentLoaded', () => {
         customLegend: document.getElementById('custom-legend'),
     };
     
+    // --- Notification & Sound System ---
+    const initializeAudio = () => {
+        if (typeof Tone !== 'undefined' && !synth) {
+            synth = new Tone.Synth({
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+            }).toDestination();
+            audioInitialized = true;
+        }
+    };
+
+    const playAlarmSound = () => {
+        if (synth) {
+            const now = Tone.now();
+            synth.triggerAttackRelease("C5", "8n", now);
+            synth.triggerAttackRelease("G5", "8n", now + 0.2);
+        }
+    };
+
+    const triggerNotification = (currentSubjectName, nextSubjectName) => {
+        playAlarmSound();
+        if (Notification.permission === 'granted') {
+            new Notification("Time's Up!", {
+                body: `Stop studying ${currentSubjectName} and start ${nextSubjectName}.`,
+                icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>'
+            });
+        }
+    };
+
+    const checkTaskEndings = () => {
+        const now = new Date();
+        const key = formatDateKey(now);
+        const schedule = state.studyData[key] || [];
+        if (schedule.length === 0) return;
+
+        for (let i = 0; i < schedule.length; i++) {
+            const item = schedule[i];
+            // Skip if completed, already notified, or has no start time
+            if (item.completed || item.notified || !item.startTime) continue;
+            
+            // Ensure startTime is a Date object
+            const startTime = new Date(item.startTime);
+            const endTime = calculateEndTime(startTime, item.durationHours);
+            const timeDiff = endTime.getTime() - now.getTime();
+
+            // Trigger within the last 2 seconds before the task ends
+            if (timeDiff > 0 && timeDiff <= 2000) {
+                item.notified = true; // Mark to prevent repeated notifications
+
+                const currentTaskName = item.name || item.text;
+                let nextTaskName = "your next task";
+
+                // Find the next non-completed task to suggest
+                for (let j = i + 1; j < schedule.length; j++) {
+                    if (!schedule[j].completed) {
+                        nextTaskName = schedule[j].name || schedule[j].text;
+                        break;
+                    }
+                }
+                
+                triggerNotification(currentTaskName, nextTaskName);
+                break; // Only handle one notification per interval to avoid spam
+            }
+        }
+    };
+
+    const setupNotificationTimer = () => {
+        if (notificationInterval) clearInterval(notificationInterval);
+        notificationInterval = setInterval(checkTaskEndings, 1000); // Check every second
+    };
+
     // --- Core Utilities & State Management ---
     const updateP2PStatus = (status) => { DOM.p2pStatus.classList.remove('hidden'); DOM.p2pStatusIndicator.className = status; };
     const setupPeerListeners = (peer) => { peer.on('open', (id) => console.log('My peer ID is: ' + id)); peer.on('connection', (conn) => { console.log('Received incoming connection'); if (state.p2p.connection) { state.p2p.connection.close(); } state.p2p.connection = conn; setupConnectionListeners(conn); }); peer.on('error', (err) => { console.error('PeerJS error:', err); updateP2PStatus('disconnected'); }); };
@@ -558,7 +633,16 @@ document.addEventListener('DOMContentLoaded', () => {
         },
     };
 
-    document.body.addEventListener('click', (e) => { const t = e.target.closest('[data-action]'); if (t && actions[t.dataset.action]) actions[t.dataset.action](t); });
+    document.body.addEventListener('click', (e) => {
+        if (!audioInitialized && typeof Tone !== 'undefined') {
+            Tone.start().then(() => {
+                initializeAudio();
+                console.log('Audio context started!');
+            });
+        }
+        const t = e.target.closest('[data-action]'); 
+        if (t && actions[t.dataset.action]) actions[t.dataset.action](t); 
+    });
     document.body.addEventListener('keydown', (e) => { const t = e.target.closest('[data-action-on-enter]'); if (t && e.key === 'Enter' && actions[t.dataset.actionOnEnter]) { e.preventDefault(); actions[t.dataset.actionOnEnter](t, e); } });
     document.body.addEventListener('dragstart', (e) => { const t = e.target.closest('[data-item-id]'); if (t) { state.ui.draggedItemId = t.dataset.itemId; e.dataTransfer.effectAllowed = 'move'; t.classList.add('dragging'); } });
     document.body.addEventListener('dragend', (e) => { const t = document.querySelector('.dragging'); if (t) t.classList.remove('dragging'); state.ui.draggedItemId = null; });
@@ -568,7 +652,16 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const createDragIcon = () => `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>`;
     
-    const init = () => { loadState(); render(); };
+    const init = () => {
+        loadState();
+        render();
+        // Request notification permission on load if not already set
+        if (typeof Notification !== 'undefined' && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+        setupNotificationTimer(); // Start the task ending checker
+    };
+    
     init();
 });
 </script>
