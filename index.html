@@ -136,13 +136,13 @@
                     
                     <div class="flex items-center border-l border-secondary pl-3 ml-1 space-x-2">
                           <button data-action="startScanToSync" title="Scan QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors sm:hidden text-subtle">
-                               <i class="fas fa-camera"></i>
+                                <i class="fas fa-camera"></i>
                           </button>
                           <button data-action="generateSyncCode" title="Show QR to Sync" class="p-2 rounded-full hover:bg-tertiary transition-colors hidden sm:block text-subtle">
-                               <i class="fas fa-qrcode"></i>
+                                <i class="fas fa-qrcode"></i>
                           </button>
                           <div id="p2p-status" class="hidden">
-                               <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
+                                <div id="p2p-status-indicator" class="disconnected" title="Sync Status"></div>
                           </div>
                     </div>
 
@@ -497,11 +497,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleEditModalClick = (e) => { if (!state.ui.swapState.active) return; const targetDiv = e.target.closest('[data-subject-name]'); if (!targetDiv) { state.ui.swapState = { active: false, subjectToSwap: null }; DOM.subjectsChecklist.querySelector('.swap-active')?.classList.remove('swap-active'); return; } e.preventDefault(); const newSubjectName = targetDiv.dataset.subjectName; const isCurrent = targetDiv.dataset.isCurrent === 'true'; if (!isCurrent) { const key = formatDateKey(new Date()); const schedule = state.studyData[key] || []; schedule.forEach(item => { if (item.type === 'subject' && item.name === state.ui.swapState.subjectToSwap) { item.name = newSubjectName; } }); state.ui.swapState = { active: false, subjectToSwap: null }; closeModal(); render(); enhancedSaveState(); } else { state.ui.swapState = { active: false, subjectToSwap: null }; targetDiv.classList.remove('swap-active'); } };
     const setupEndTimeModal = () => DOM.sessionEndTimeInput.value = state.settings.sessionEndTime;
     
-    // MODIFIED FUNCTION: setupEditHoursModal
     const setupEditHoursModal = (itemId) => {
         const item = state.studyData[formatDateKey(new Date())]?.find(s => s.id == itemId);
-        if(!item) return;
-
+        if (!item) return;
+    
         const hoursInput = DOM.hoursInput;
         hoursInput.dataset.itemId = item.id;
         if (item.type === 'subject') {
@@ -518,19 +517,24 @@ document.addEventListener('DOMContentLoaded', () => {
             hoursInput.min = "5";
             hoursInput.step = "5";
         }
-        
-        // This is the more reliable fix for the Enter key.
-        // Instead of simulating a click, it calls the save action directly.
+    
         const enterHandler = (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                actions.confirmEditHours(); // Call the action function directly
+                actions.confirmEditHours();
                 hoursInput.removeEventListener('keydown', enterHandler);
             }
         };
-        // Ensure no old listeners are attached before adding a new one.
         hoursInput.removeEventListener('keydown', enterHandler);
         hoursInput.addEventListener('keydown', enterHandler);
+
+        // --- MODIFICATION: Auto-focus and select input content ---
+        // A minimal timeout ensures the element is visible and ready before focusing.
+        setTimeout(() => {
+            hoursInput.focus();
+            hoursInput.select();
+        }, 0);
+        // --- END MODIFICATION ---
     };
     
     const setupThemeModal = () => { const a = [ { n: 'green', c: '#22c55e' }, { n: 'blue', c: '#3b82f6' }, { n: 'purple', c: '#a855f7' }, { n: 'red', c: '#ef4444' } ]; DOM.themeOptions.innerHTML = `<div><h5 class="text-sm font-bold text-subtle mb-3">Theme</h5><div class="grid grid-cols-2 gap-4"><button data-action="setTheme" data-theme="light" class="btn btn-secondary ${state.settings.theme==='light'?'border-2 border-main':''}" style="${state.settings.theme==='light'?'border-color: var(--accent-primary)':''}">Light</button><button data-action="setTheme" data-theme="dark" class="btn btn-secondary ${state.settings.theme==='dark'?'border-2 border-main':''}" style="${state.settings.theme==='dark'?'border-color: var(--accent-primary)':''}">Dark</button></div></div><div><h5 class="text-sm font-bold text-subtle mb-3">Accent</h5><div class="flex items-center justify-around gap-4">${a.map(x=>`<button data-action="setAccent" data-accent="${x.n}" class="w-12 h-12 rounded-full ${state.settings.accent===x.n?'ring-2 ring-offset-2 ring-offset-bg-main':''}" style="background-color:${x.c}; ${state.settings.accent===x.n?'border-color: var(--accent-primary)':''}"></button>`).join('')}</div></div>`; };
@@ -658,9 +662,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const init = () => {
         loadState();
         render();
-        if (typeof Notification !== 'undefined' && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission();
+        // --- CORRECTED NOTIFICATION LOGIC ---
+        if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    console.log("Notification permission granted.");
+                } else {
+                    console.log("Notification permission denied.");
+                }
+            });
         }
+        // --- END CORRECTION ---
         setupNotificationTimer();
     };
     
